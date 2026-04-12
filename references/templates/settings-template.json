@@ -1,0 +1,34 @@
+{
+  "_comment_removed_in_generation": "이 파일은 템플릿입니다. generator가 {{PLACEHOLDER}}를 대체하고 _comment 필드를 제거합니다. 사용하지 않는 hook 블록은 통째로 삭제하세요.",
+  "permissions": {
+    "allow": [
+      "{{PERMISSION_RULES}}"
+    ]
+  },
+  "hooks": {
+    "SessionStart": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "{{SESSION_START_HOOK_CMD}}",
+            "timeout": 5000
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "{{POST_TOOL_MATCHER}}",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "{{POST_TOOL_HOOK_CMD}}",
+            "timeout": 5000
+          }
+        ]
+      }
+    ]
+  }
+}
