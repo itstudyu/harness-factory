@@ -1,19 +1,31 @@
 #!/usr/bin/env python3
-# {{HOOK_NAME}} — hook
-# stdin: JSON payload from Claude Code
-# stdout: JSON response (hookSpecificOutput)
+# {{HOOK_NAME}} — Claude Code hook
+# stdin: JSON payload (session_id, cwd, hook_event_name, tool_name, tool_input, ...)
+# stdout: JSON response (universal fields + hookSpecificOutput)
+# ref: https://code.claude.com/docs/en/hooks
+#
+# 지원되는 hook 이벤트명 (2026-04 기준 공식 목록):
+#   SessionStart, SessionEnd, UserPromptSubmit,
+#   PreToolUse, PostToolUse, PostToolUseFailure,
+#   PermissionRequest, PermissionDenied,
+#   Notification, Stop, StopFailure,
+#   SubagentStart, SubagentStop,
+#   TaskCreated, TaskCompleted,
+#   InstructionsLoaded, ConfigChange,
+#   CwdChanged, FileChanged,
+#   WorktreeCreate, WorktreeRemove,
+#   PreCompact, PostCompact,
+#   Elicitation, ElicitationResult,
+#   TeammateIdle
 import sys
 import json
-import os
 
-# 훅 이벤트명: SessionStart | PreToolUse | PostToolUse | SubagentStart | Stop
 EVENT_NAME = "{{HOOK_EVENT}}"
 
 EMPTY = json.dumps({})
 
 
 def read_stdin():
-    """Claude Code가 전달하는 JSON payload를 읽는다."""
     try:
         return json.load(sys.stdin)
     except (json.JSONDecodeError, ValueError):
@@ -21,7 +33,6 @@ def read_stdin():
 
 
 def build_output(content):
-    """hookSpecificOutput JSON을 생성한다."""
     return json.dumps({
         "hookSpecificOutput": {
             "hookEventName": EVENT_NAME,

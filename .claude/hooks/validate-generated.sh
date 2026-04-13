@@ -1,14 +1,37 @@
 #!/usr/bin/env bash
 # validate-generated.sh — PostToolUse hook for Write|Edit
-# 생성된 agent/skill 파일의 frontmatter 필수 필드를 검증한다. (비차단)
+# 공식 Claude Code hook 스펙: 입력은 stdin JSON으로 전달된다.
+# ref: https://code.claude.com/docs/en/hooks (PostToolUse input schema)
+# Exit codes: 0=pass, 2=block (HARNESS_STRICT=1 시), 그 외=non-blocking error
 set -euo pipefail
 
-FILE_PATH="${1:-}"
+# stdin JSON payload에서 file_path 추출 (jq 없으면 python3로 폴백)
+INPUT="$(cat || true)"
 
-# 대상이 아닌 파일은 스킵
+FILE_PATH=""
+if [ -n "$INPUT" ]; then
+  if command -v jq >/dev/null 2>&1; then
+    FILE_PATH=$(printf '%s' "$INPUT" | jq -r '.tool_input.file_path // empty' 2>/dev/null || true)
+  else
+    FILE_PATH=$(printf '%s' "$INPUT" | python3 -c "
+import json, sys
+try:
+    d = json.loads(sys.stdin.read())
+    print((d.get('tool_input') or {}).get('file_path') or '')
+except Exception:
+    pass
+" 2>/dev/null || true)
+  fi
+fi
+
+# 파일 경로가 없으면 non-file 도구 호출이므로 스킵
+if [ -z "$FILE_PATH" ]; then
+  exit 0
+fi
+
+# 대상 분류
 IS_AGENT=false
 IS_SKILL=false
-
 if [[ "$FILE_PATH" =~ \.claude/agents/.*\.md$ ]]; then
   IS_AGENT=true
 elif [[ "$FILE_PATH" =~ \.claude/skills/.*/SKILL\.md$ ]]; then
@@ -17,10 +40,8 @@ else
   exit 0
 fi
 
-# 파일 존재 확인
-if [ ! -f "$FILE_PATH" ]; then
-  exit 0
-fi
+# 파일 존재 확인 (PostToolUse 시점에는 존재해야 함)
+[ -f "$FILE_PATH" ] || exit 0
 
 WARNINGS=0
 
@@ -33,26 +54,27 @@ check_frontmatter_field() {
   fi
 }
 
-# 에이전트 파일 검증
 if [ "$IS_AGENT" = true ]; then
   check_frontmatter_field "name" "name"
   check_frontmatter_field "description" "description"
   check_frontmatter_field "tools" "tools"
   check_frontmatter_field "permissionMode" "permissionMode"
 
-  # Negative Space 섹션 확인
+  # PGE 역할 태그 확인 (공식 frontmatter에 role이 없으므로 description 태그로 관례화)
+  if ! head -20 "$FILE_PATH" | grep -qE "^description:.*\[(planner|generator|evaluator)\]"; then
+    echo "  INFO: description에 [planner]/[generator]/[evaluator] 태그가 없습니다 — $FILE_PATH" >&2
+  fi
+
   if ! grep -q "하지 않는 것" "$FILE_PATH"; then
     echo "  WARN: Negative Space 섹션이 없습니다 — $FILE_PATH" >&2
     WARNINGS=$((WARNINGS + 1))
   fi
 
-  # 선택 필드 안내 (경고 수준 낮음)
   if ! head -20 "$FILE_PATH" | grep -q "^maxTurns:"; then
     echo "  INFO: maxTurns 필드 미지정 (기본값 적용됨) — $FILE_PATH" >&2
   fi
 fi
 
-# 스킬 파일 검증
 if [ "$IS_SKILL" = true ]; then
   check_frontmatter_field "name" "name"
   check_frontmatter_field "description" "description"
@@ -61,7 +83,6 @@ fi
 if [ "$WARNINGS" -gt 0 ]; then
   echo "" >&2
   echo "  ⚠ $WARNINGS 개 필수 항목 누락 — $FILE_PATH" >&2
-  # Strict 모드: HARNESS_STRICT=1 환경변수 설정 시 차단 (exit 2 = block/feedback)
   if [ "${HARNESS_STRICT:-0}" = "1" ]; then
     echo "  HARNESS_STRICT=1이 설정되어 있어 작업을 차단합니다." >&2
     exit 2

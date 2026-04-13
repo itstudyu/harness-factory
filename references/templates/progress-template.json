@@ -4,5 +4,9 @@
   "updated_at": null,
   "current_session_id": null,
   "session_lock_acquired_at": null,
+  "target": null,
+  "retry_count": 0,
+  "max_retries": 2,
+  "last_phase": null,
   "features": []
 }

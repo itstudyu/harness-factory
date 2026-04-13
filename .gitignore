@@ -2,6 +2,8 @@
 __MACOSX/
 .nova/sessions.jsonl
 .nova/contracts/
+.nova/progress.json
+.claude/settings.local.json
 *.swp
 *.swo
 *~

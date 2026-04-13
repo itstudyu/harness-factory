@@ -1,154 +1,94 @@
 ---
 name: rules-updater
-description: harness-rules.md와 harness-references.md를 최신 공식 문서 및 trusted article 기반으로 갱신하는 유틸리티 스킬. 유저가 새 URL을 제공하거나 AI가 최신 article을 자동 검색하여 반영한다.
+description: harness-rules.md와 harness-references.md를 최신 공식 문서 및 trusted article 기반으로 갱신한다. 유저가 새 URL을 제공하거나 AI가 WebSearch로 최신 article을 검색해 반영한다.
+disable-model-invocation: true
 ---
 
 # Rules Updater
 
 `harness-rules.md`와 `harness-references.md`를 최신 상태로 유지한다.
-신뢰할 수 있는 공식 문서와 trusted article을 주기적으로 반영한다.
 
 ## 실행 모드
 
-### 모드 1: 기존 URL 갱신
-
-등록된 모든 URL을 재fetch하여 변경사항을 반영한다.
-
-### 모드 2: 새 URL 추가 (유저 제공)
-
-유저가 제공한 URL을 검증 후 references에 추가하고 rules에 반영한다.
-
-### 모드 3: 최신 article 자동 검색
-
-WebSearch로 최신 trusted article을 찾아 제안하고, 유저 승인 후 추가한다.
+1. **기존 URL 갱신** — 등록된 모든 URL 재fetch
+2. **새 URL 추가** — 유저 제공 URL 검증 후 추가
+3. **AI 자동 검색** — WebSearch로 최신 trusted article 제안
 
 ## 절차
 
 ### 1. 모드 선택
 
-유저에게 질문:
-
 ```
 rules-updater를 어떤 모드로 실행할까요?
-
-1. 기존 URL 전체 갱신 (정기 갱신용)
-2. 새 URL 추가 (제공하실 URL이 있나요?)
+1. 기존 URL 전체 갱신
+2. 새 URL 추가 (URL을 제공해주세요)
 3. AI가 최신 article 자동 검색
 ```
 
 ### 2. 모드 1: 기존 URL 갱신
 
 ```bash
-# 기존 URL 추출
 grep -oE 'https://[^\s)]+' references/harness-references.md | sort -u
 ```
 
 각 URL에 대해:
-1. WebFetch로 최신 내용 가져오기
-2. 핵심 요약 비교 (이전 버전 vs 현재)
-3. 차이가 있으면 `harness-references.md` 해당 섹션 업데이트
-4. 주요 변경사항을 `harness-rules.md`에 반영
+1. WebFetch로 최신 내용 수집
+2. 핵심 요약 비교 (이전 vs 현재)
+3. 차이 있으면 `harness-references.md` 해당 섹션 업데이트
+4. 주요 변경을 `harness-rules.md`에 반영하며 **각 항목에 출처 각주 번호 유지**
 
 ### 3. 모드 2: 새 URL 추가
 
-유저가 URL 제공 시:
-
 ```bash
-# 신뢰성 검증
-python3 << 'EOF'
+python3 - <<'PY'
 url = "{유저_제공_URL}"
-trusted_domains = [
-    "anthropic.com",
-    "docs.anthropic.com",
-    "code.claude.com",
-    "mitchellh.com",
-    "simonwillison.net",
-    "lilianweng.github.io",
-    "openai.com/blog",
-    "deepmind.google",
-    "karpathy.ai",
-    "morphllm.com",
-]
-is_trusted = any(d in url for d in trusted_domains)
-print(f"Trusted: {is_trusted}")
-EOF
+trusted = ["anthropic.com","docs.anthropic.com","platform.claude.com","code.claude.com",
+           "mitchellh.com","simonwillison.net","lilianweng.github.io",
+           "openai.com/blog","deepmind.google","karpathy.ai","morphllm.com"]
+print("Trusted:", any(d in url for d in trusted))
+PY
 ```
 
-신뢰할 수 있는 도메인이 아니면 유저에게 확인:
-```
-이 도메인은 기본 신뢰 목록에 없습니다. 
-이유와 함께 추가를 진행할까요? (Y/N)
-```
-
-승인 후:
-1. WebFetch로 내용 가져오기
-2. `harness-references.md`에 새 섹션 추가
-3. `harness-rules.md`에 핵심 규칙 반영
-4. 신뢰 목록에도 추가 (선택적)
+신뢰 도메인 아니면 유저에게 사유 질의 후 승인.
+승인되면 WebFetch → references에 새 섹션 추가 → rules에 핵심 규칙 반영(출처 번호 부여).
 
 ### 4. 모드 3: AI 자동 검색
 
-```
-WebSearch 쿼리 예시:
-- "AI agent harness design 2026"
-- "Claude Code best practices new features"
-- "prompt caching optimization patterns"
-- "multi-agent orchestration evaluator pattern"
-```
+WebSearch 쿼리 예시: `AI agent harness design 2026`, `Claude Code best practices`, `prompt caching patterns`, `evaluator-optimizer pattern`.
 
-결과 중 trusted 도메인의 것만 필터링하여 유저에게 제안:
-```
-다음 새 article을 발견했습니다. 추가할까요?
+trusted 도메인 필터 후 유저에게 제안.
 
-1. [제목] - {URL} (도메인: anthropic.com) — 핵심 요약
-2. ...
-```
-
-### 5. harness-rules.md 재압축
-
-references 업데이트 후 반드시:
+### 5. 변경 검증
 
 ```bash
-# 토큰 수 확인
+# 현재 크기 확인 (하드 한도가 아니라 캐시/context 예산 관점의 예산)
 wc -w references/harness-rules.md
+wc -c references/harness-rules.md
 
-# 2200 words 초과 시 압축 필요
-if [ $(wc -w < references/harness-rules.md) -gt 2200 ]; then
-  echo "WARN: 토큰 한도 초과. 재압축 필요"
-fi
+# rules.md의 각 섹션은 출처 각주 번호 [n]과 매핑되어야 함
+grep -nE '\[[0-9]+\]' references/harness-rules.md | head -30
 ```
 
-압축 원칙:
-- 각 섹션당 핵심 3-5 bullet만 유지
-- "왜"보다 "무엇을/어떻게"에 집중
-- 중복 제거
-- 예시는 references로 이동, rules에는 원칙만
+단어 수 경계는 하드 한도가 아니다. 기준은 두 가지:
+- **Caching 관점**: rules는 CLAUDE.md import로 system 계층에 들어가므로 자주 바뀌면 캐시 무효화. 한 번 정한 뒤 변경 빈도를 낮게 유지한다.
+- **Signal-to-noise**: "이 줄을 지우면 실수가 생기는가?"를 모든 bullet에 적용. 해당 안 되면 제거(Best Practices #8).
 
-### 6. 갱신일 업데이트
+### 6. 갱신일 / 이력
 
 ```bash
-# harness-rules.md의 frontmatter 갱신
 TODAY=$(date +%Y-%m-%d)
-# last_updated: "..." 라인을 오늘 날짜로 변경
+# references/harness-rules.md frontmatter last_updated을 $TODAY로
+# references/harness-references.md 갱신 이력 테이블에 1줄 추가
 ```
 
-### 7. 갱신 이력 기록
-
-`references/harness-references.md`의 "갱신 이력" 테이블에 항목 추가:
-
-```markdown
-| 2026-04-13 | 모드 1: 7개 URL 전체 갱신 (변경: 2건) |
-| 2026-04-20 | 모드 2: Simon Willison 새 article 추가 |
-| 2026-04-27 | 모드 3: AI 자동 검색으로 Karpathy 발표 추가 |
-```
-
-## 신뢰 도메인 목록
+## 신뢰 도메인
 
 ```yaml
 trusted_domains:
   official:
     - anthropic.com
     - docs.anthropic.com
+    - platform.claude.com
     - code.claude.com
     - openai.com/blog
     - deepmind.google
@@ -161,7 +101,7 @@ trusted_domains:
     - morphllm.com
     - huggingface.co/blog
   papers:
-    - arxiv.org  # 단, 인용 100회 이상 필요
+    - arxiv.org  # 인용 100회 이상 권장
 ```
 
 ## 보고 형식
@@ -171,18 +111,17 @@ trusted_domains:
 - 모드: 1 / 2 / 3
 - 갱신된 URL: N개
 - 추가된 URL: N개
-- harness-rules.md 토큰 수: N words (한도 2200)
-- harness-references.md 섹션 수: N개
+- rules.md: N words / N bytes
 - 최종 last_updated: YYYY-MM-DD
 
 ### 주요 변경사항
-- {URL 1}: {변경 요약}
-- {URL 2}: {변경 요약}
+- {URL}: {변경 요약}
 ```
 
 ## 주의사항
 
-- 모든 변경 전에 git diff로 차이 확인
-- 압축 시 기존 규칙 삭제 전 유저 확인
-- AI 자동 검색 결과는 반드시 유저 승인 필요
-- 신뢰 도메인이 아닌 경우 반드시 에스컬레이션
+- 모든 변경 전 git diff로 차이 확인
+- 기존 규칙 삭제 전 유저 확인
+- AI 자동 검색 결과는 반드시 유저 승인
+- 신뢰 도메인이 아니면 에스컬레이션
+- rules의 각 항목에 출처 번호가 매핑되는지 반드시 확인 — 출처 미매핑 항목 추가 금지

@@ -1,9 +1,18 @@
 {
-  "_comment_removed_in_generation": "generator가 {{PLACEHOLDER}}를 대체하고 _comment 필드를 제거. 미사용 hook 블록은 통째로 삭제.",
   "$schema": "https://json.schemastore.org/claude-code-settings.json",
   "permissions": {
     "allow": [
-      "{{PERMISSION_RULES}}"
+      "Bash(find:*)",
+      "Bash(ls:*)",
+      "Bash(wc:*)",
+      "Bash(python3:*)",
+      "Bash(git:*)",
+      "Bash(mkdir:*)",
+      "Bash(chmod:*)",
+      "Bash(date:*)",
+      "Bash(jq:*)",
+      "WebFetch",
+      "WebSearch"
     ]
   },
   "hooks": {
@@ -13,7 +22,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "{{SESSION_START_HOOK_CMD}}",
+            "command": "bash .claude/hooks/inject-harness-rules.sh",
             "timeout": 5000
           }
         ]
@@ -21,11 +30,11 @@
     ],
     "PreToolUse": [
       {
-        "matcher": "{{PRE_TOOL_MATCHER}}",
+        "matcher": "Write",
         "hooks": [
           {
             "type": "command",
-            "command": "{{PRE_TOOL_HOOK_CMD}}",
+            "command": "bash .claude/hooks/enforce-planner-write.sh",
             "timeout": 5000
           }
         ]
@@ -33,11 +42,11 @@
     ],
     "PostToolUse": [
       {
-        "matcher": "{{POST_TOOL_MATCHER}}",
+        "matcher": "Write|Edit",
         "hooks": [
           {
             "type": "command",
-            "command": "{{POST_TOOL_HOOK_CMD}}",
+            "command": "bash .claude/hooks/validate-generated.sh",
             "timeout": 5000
           }
         ]

@@ -1,13 +1,12 @@
 ---
 name: {{AGENT_NAME}}
-description: {{DESCRIPTION_KO}}
-role: {{ROLE}}  # planner | generator | evaluator
+description: "[{{PGE_TAG}}] {{DESCRIPTION_KO}}"
 tools: {{TOOLS}}
 disallowedTools: {{DISALLOWED_TOOLS}}
 model: {{MODEL}}
 maxTurns: {{MAX_TURNS}}
 permissionMode: {{PERMISSION_MODE}}
-# isolation 필드: generator 역할일 때만 포함. 그 외는 이 줄 전체 삭제.
+# isolation 줄은 Generator이면서 대상이 현재 repo일 때만 유지. 그 외 삭제.
 isolation: {{ISOLATION}}
 ---
 
@@ -15,7 +14,7 @@ isolation: {{ISOLATION}}
 
 ## 핵심 정체성
 
-- {{PGE_ROLE}} (Planner / Generator / Evaluator) 역할
+- {{PGE_ROLE}} 역할 — PGE 태그는 description의 `[{{PGE_TAG}}]`로 표기 (공식 frontmatter에 role 필드 없음)
 - {{IDENTITY_DESCRIPTION}}
 
 ## 첫 번째 행동
