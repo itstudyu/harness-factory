@@ -214,13 +214,142 @@ Explore → Plan → Code → Commit (4단계)
 
 ---
 
+---
+
+## [11] Claude Code: Orchestrate teams of Claude Code sessions
+**URL**: https://code.claude.com/docs/en/agent-teams
+
+### 검증된 인용
+- *"Agent teams let you coordinate multiple Claude Code instances working together. One session acts as the team lead, coordinating work, assigning tasks, and synthesizing results."*
+- *"Agent teams are experimental and disabled by default. Enable them by adding `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS` to your settings.json or environment."*
+- Requires Claude Code v2.1.32+
+
+### Sub-agents vs Agent Teams (공식 비교)
+|  | Subagents | Agent teams |
+|---|---|---|
+| Communication | Report to main agent only | Teammates message each other |
+| Coordination | Main agent manages | Shared task list, self-coordination |
+| Best for | Focused tasks where only the result matters | Complex work requiring discussion |
+| Token cost | Lower (summarized back) | Higher (each is separate Claude) |
+
+### Best use cases
+- Research and review (여러 teammate가 다각도 투입)
+- New modules / features (각자 다른 부분 담당)
+- Debugging with competing hypotheses (scientific debate 구조)
+- Cross-layer coordination (frontend/backend/tests)
+
+### Architecture 구성요소
+| Component | Role |
+|---|---|
+| Team lead | 메인 세션, 팀 생성·teammate 소환·작업 조율 |
+| Teammates | 독립 Claude Code 인스턴스 |
+| Task list | 공유 작업 리스트 (pending/in_progress/completed, dependency 지원) |
+| Mailbox | 에이전트 간 메시징 |
+
+### 저장 경로
+- Team config: `~/.claude/teams/{team-name}/config.json`
+- Task list: `~/.claude/tasks/{team-name}/`
+
+### 한계
+- In-process teammate는 `/resume`·`/rewind` 복원 안 됨
+- Teammate가 task completed 마킹을 놓쳐 의존 task가 막히는 경우 있음
+- Lead 승격·변경 불가, nested team 불가, 세션당 1팀
+- tmux / iTerm2 없으면 split-pane 불가 (VS Code / Windows Terminal / Ghostty 비지원)
+
+### 적용 규칙
+- PGE 같은 sequential 루프는 sub-agent 유지
+- 향후 "다각 리뷰 / 경합 가설 조사" 기능 추가 시 agent team 고려
+
+---
+
+## [12] Anthropic: Equipping agents for the real world with Agent Skills
+**URL**: https://claude.com/blog/equipping-agents-for-the-real-world-with-agent-skills
+(`www.anthropic.com/engineering/equipping-agents-for-the-real-world-with-agent-skills`는 308로 redirect)
+
+### 검증된 인용
+- *"Progressive disclosure is the core design principle that makes Agent Skills flexible and scalable."*
+- *"organized folders of instructions, scripts, and resources that agents can discover and load dynamically to perform better at specific tasks"*
+- *"Like a well-organized manual that starts with a table of contents, then specific chapters, and finally a detailed appendix."*
+
+### Progressive Disclosure 3 레벨
+- **Level 1 — Metadata**: `name` + `description`만 startup에 로드
+- **Level 2 — Core Context**: 관련 태스크 시 `SKILL.md` 본문 로드
+- **Level 3+ — Granular Details**: 필요 시점에만 외부 참조 파일
+
+### Skill 설계 3대 원칙
+1. **Start with evaluation** — 실제 태스크에서 에이전트가 막히는 지점을 관찰
+2. **Structure for scale** — SKILL.md 비대해지면 별도 파일 분리, mutually-exclusive 컨텍스트 분리
+3. **Think from Claude's perspective** — `name`·`description`이 자동 트리거이므로 특별히 관리
+
+### 적용 규칙
+- rules 3장에 Progressive Disclosure 추가
+- SKILL.md 500라인 이하 권장, 초과 시 분리
+
+---
+
+## [13] Anthropic: Building agents with the Claude Agent SDK
+**URL**: https://claude.com/blog/building-agents-with-the-claude-agent-sdk
+(`www.anthropic.com/engineering/building-agents-with-the-claude-agent-sdk`는 308로 redirect)
+
+### 검증된 인용
+- Canonical loop: *"gather context -> take action -> verify work -> repeat."*
+- *"giving Claude a computer unlocks the ability to build agents that are more effective than before."*
+- *"Tools are prominent in Claude's context window, making them the primary actions Claude will consider."*
+- *"Code is precise, composable, and infinitely reusable."*
+
+### Agent Loop 3단계
+1. **Gather context** — agentic search via bash, semantic search, subagents, context compaction
+2. **Take action** — tools, bash/scripts, code generation, MCP integrations
+3. **Verify work** — rules-based feedback (linting), visual feedback, LLM judging
+
+### Context Management 원칙
+- 파일시스템 구조를 "a form of context engineering"으로 활용
+- 초기엔 vector embedding보다 `grep`/`tail` agentic search 선호
+- Sub-agent로 대형 context 격리
+- 토큰 임계 근접 시 자동 compaction
+
+### 적용 규칙
+- rules 2장에 공식 gather-act-verify 루프 추가
+- rules 3장에 "Tools as primary operations"·"Code as Output" 추가
+- rules 5장에 agentic search 선호 원칙 추가
+
+---
+
+## [14] Anthropic: Code execution with MCP
+**URL**: https://www.anthropic.com/engineering/code-execution-with-mcp
+
+### 검증된 인용
+- *"Tool descriptions occupy more context window space, increasing response time and costs."*
+- 10,000행 스프레드시트 필터링 사례: *"reducing from 150,000 tokens to 2,000 tokens... a time and cost saving of 98.7%"*
+
+### 핵심 주장
+- 모든 MCP 도구 정의를 upfront 로드하면 (a) context bloat, (b) intermediate 결과가 context를 2회 왕복 → 비효율
+- 대안: MCP 서버를 code API로 노출 (`./servers/google-drive/getDocument.ts` 같은 파일 구조) → 에이전트가 필요한 것만 탐색·로드
+
+### 하네스 설계 3원칙
+1. **Progressive disclosure** — 도구를 upfront 전부가 아니라 on-demand
+2. **Privacy-preserving** — 중간 결과는 실행 환경에만, 명시적 반환만 모델로
+3. **State persistence** — 중간 결과를 파일로 저장해 resume·재사용
+
+### 적용 규칙
+- rules 5장에 Code Execution with MCP 토큰 절감 원칙 추가
+- 큰 데이터 처리 도구는 파일 저장 + 요약 반환 패턴 채택
+
+---
+
 ## 추가 소스 (미검증 or 보조)
 
 ### Simon Willison
-주요 URL 2개는 404 응답 (이전 references에 등록되어 있었음). 현재 rules에서 제거. 추후 WebSearch로 유효 URL 확인 후 재등록.
+주요 URL 2개는 404 응답. 현재 rules에서 제거. 추후 WebSearch로 유효 URL 확인 후 재등록.
 
 ### MorphLLM: Agent Engineering Primer
 URL·본문 재검증 필요. 현재 rules에는 포함하지 않음.
+
+### Anthropic: 2026 Agentic Coding Trends Report (PDF)
+`resources.anthropic.com/hubfs/2026%20Agentic%20Coding%20Trends%20Report.pdf` — 통계·예측 report. 현재 rules에 반영하지 않음 (근거 원칙 중심).
+
+### Anthropic: Building a C compiler with agents
+`www.anthropic.com/engineering/building-c-compiler` — 16 agents / 2,000 세션 사례. case study이므로 출처 각주에서 제외.
 
 ---
 
@@ -242,3 +371,4 @@ URL·본문 재검증 필요. 현재 rules에는 포함하지 않음.
 |------|----------|
 | 2026-04-13 | 초기 작성 — 7개 URL + 2개 추가 소스 분석 |
 | 2026-04-13 | v2.0 재검증 — 7개 URL + 공식 hooks/skills/settings 4종 원문 대조 후 오매핑 5건 제거, 출처 각주 시스템 도입 |
+| 2026-04-14 | v2.1 — 새 공식 출처 4종 추가: [11] Agent Teams, [12] Agent Skills blog, [13] Claude Agent SDK, [14] Code Execution with MCP. Progressive disclosure / gather-act-verify / code-based orchestration 원칙 rules에 반영 |

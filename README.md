@@ -82,5 +82,9 @@ harness-factory/
 8. [Claude Code: Best Practices](https://code.claude.com/docs/en/best-practices)
 9. [Mitchell Hashimoto: AI Adoption Journey](https://mitchellh.com/writing/my-ai-adoption-journey)
 10. [Lilian Weng: LLM Powered Autonomous Agents](https://lilianweng.github.io/posts/2023-06-23-agent/)
+11. [Claude Code: Agent Teams](https://code.claude.com/docs/en/agent-teams)
+12. [Anthropic: Equipping Agents with Agent Skills](https://claude.com/blog/equipping-agents-for-the-real-world-with-agent-skills)
+13. [Anthropic: Building Agents with the Claude Agent SDK](https://claude.com/blog/building-agents-with-the-claude-agent-sdk)
+14. [Anthropic: Code Execution with MCP](https://www.anthropic.com/engineering/code-execution-with-mcp)
 
 상세 분석·인용·검증 실패 이력: `references/harness-references.md`
