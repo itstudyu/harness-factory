@@ -4,6 +4,10 @@ __MACOSX/
 .nova/contracts/
 .nova/progress.json
 .claude/settings.local.json
+# upgrade 런타임 산출물
+upgrade-report.md
+upgrade-applied.md
+orchestrator-state.json
 *.swp
 *.swo
 *~
