@@ -16,13 +16,17 @@ harness-factory/
 │   ├── agents/
 │   │   ├── harness-architect.md     # [planner]   구조 설계
 │   │   ├── harness-generator.md     # [generator] 파일 생성
-│   │   └── harness-auditor.md       # [evaluator] 검증
+│   │   ├── harness-auditor.md       # [evaluator] 12+1 rubric 검증
+│   │   ├── harness-diff-reporter.md # [evaluator] 업그레이드 진단 리포트
+│   │   └── harness-upgrader.md      # [generator] 업그레이드 patch 적용 (worktree)
 │   ├── hooks/
 │   │   ├── inject-harness-rules.sh  # SessionStart: 메타데이터만 주입
+│   │   ├── suggest-upgrade.sh       # SessionStart: 7일 경과 시 /harness-upgrade 제안
 │   │   ├── enforce-planner-write.sh # PreToolUse: Planner Write 경로 강제
 │   │   └── validate-generated.sh    # PostToolUse: stdin JSON 기반 검증
 │   ├── skills/
-│   │   ├── harness-factory/SKILL.md # 메인 Orchestrator 스킬
+│   │   ├── harness-factory/SKILL.md # 메인 Orchestrator 스킬 (새 하네스 생성)
+│   │   ├── harness-upgrade/SKILL.md # 업그레이드 오케스트레이션 스킬
 │   │   └── rules-updater/SKILL.md   # references/rules 갱신 스킬
 │   ├── settings.json                # 팀 공유 (checked-in)
 │   └── settings.local.json          # 개인 override (gitignored)

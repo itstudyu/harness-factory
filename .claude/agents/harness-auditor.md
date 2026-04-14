@@ -58,6 +58,8 @@ permissionMode: default
 | 11 | Placeholder | 잔여 | HIGH | `.claude/` 하위에 `{{UPPER}}` / `{대상경로}` / `{프로젝트명}` 0건 | python 스캔 |
 | 12 | JSON | 유효성 | HIGH | 모든 `.json` 유효 | `python3 -m json.tool` |
 | bonus | Frontmatter | 공식 필드만 | HIGH | 에이전트에 `role:` 등 비공식 필드 없음 | YAML 파싱 |
+| ext-1 | Upgrade | 리포트 반영 | HIGH | `.nova/contracts/upgrade-report.md`가 있으면 scope 내 MISSING/WARN 항목이 실제 파일에 반영됨 | report parsing + file grep |
+| ext-2 | Upgrade | rules 보존 | HIGH | upgrader는 `references/harness-rules.md`·`harness-references.md`를 변경하지 않음 | `git diff main` 검사 |
 
 ## 검증 절차 (Python 기반, YAML 공식 파싱)
 

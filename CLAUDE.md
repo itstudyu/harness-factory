@@ -51,4 +51,9 @@ harness-factory (Orchestrator 스킬)
 ## 주요 스킬
 
 - `/harness-factory` — 오케스트레이션 진입점. 하네스 구조 자동 생성
+- `/harness-upgrade [repo]` — 기존 하네스를 최신 rules로 자동 업그레이드 (진단 → patch → 검수 → 유저 확인 후 머지). 인자 없으면 현 repo, 인자 있으면 대상 repo
 - `/rules-updater` — 설계 원칙·참고자료 갱신
+
+## 자동 제안
+
+`references/harness-rules.md`가 마지막 갱신 후 7일 이상 경과하면 SessionStart 훅이 `/harness-upgrade` 실행을 자동 제안한다 (쿨다운 7일).

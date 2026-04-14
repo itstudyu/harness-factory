@@ -1,5 +1,5 @@
 {
-  "schema_version": 2,
+  "schema_version": 3,
   "project": "{{PROJECT_NAME}}",
   "updated_at": null,
   "current_session_id": null,
@@ -8,5 +8,8 @@
   "retry_count": 0,
   "max_retries": 2,
   "last_phase": null,
+  "upgrade_attempts": 0,
+  "last_upgrade_at": null,
+  "upgrade_started_at": null,
   "features": []
 }
