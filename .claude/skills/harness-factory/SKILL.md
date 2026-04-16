@@ -34,7 +34,7 @@ python3 - <<'PY'
 import json, pathlib
 p = pathlib.Path(".nova/progress.json")
 p.parent.mkdir(parents=True, exist_ok=True)
-data = {"schema_version": 2, "project": "harness-factory", "retry_count": 0, "max_retries": 2,
+data = {"schema_version": 3, "project": "harness-factory", "retry_count": 0, "max_retries": 2,
         "last_phase": None, "target": None}
 p.write_text(json.dumps(data, indent=2))
 PY

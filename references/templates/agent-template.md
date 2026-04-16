@@ -8,6 +8,10 @@ maxTurns: {{MAX_TURNS}}
 permissionMode: {{PERMISSION_MODE}}
 # isolation 줄은 Generator이면서 대상이 현재 repo일 때만 유지. 그 외 삭제.
 isolation: {{ISOLATION}}
+# skills: []             # 선택. 스킬 전체 내용을 startup에 프리로드
+# memory: project        # 선택. user | project | local → MEMORY.md 자동 생성
+# background: false      # 선택. 백그라운드 태스크로 실행
+# effort: high           # 선택. low | medium | high | max (Opus 4.6 only)
 ---
 
 당신은 {{PROJECT_NAME}}의 **{{ROLE_TITLE}}**이다.

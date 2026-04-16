@@ -109,13 +109,33 @@
 ### 공식 지원 frontmatter 필드 (2026-04 기준)
 `name` (필수), `description` (필수), `tools`, `disallowedTools`, `model`, `permissionMode`, `maxTurns`, `skills`, `mcpServers`, `memory`, `background`, `effort`, `isolation`, `color`, `initialPrompt`, `hooks`
 
+### 신규/확장 필드 상세
+- `skills`: 스킬 전체 내용을 startup에 프리로드 (Level 2 content 즉시 주입)
+- `mcpServers`: 특정 sub-agent에 MCP 서버 스코핑 (inline 또는 reference)
+- `memory`: `user` | `project` | `local` → MEMORY.md 자동 생성, 200행/25KB 자동 로드
+- `background`: true → 백그라운드 태스크로 실행
+- `effort`: `low` | `medium` | `high` | `max` (Opus 4.6 only)
+- `color`: red | blue | green | yellow | purple | orange | pink | cyan
+- `initialPrompt`: `--agent`로 메인 세션 실행 시 자동 제출되는 첫 턴
+
+### 빌트인 sub-agent 3종
+- **Explore**: Haiku, 읽기 전용, thoroughness levels (quick/medium/very thorough)
+- **Plan**: 모델 상속, 읽기 전용, plan-mode research
+- **General-purpose**: 전체 도구, 복잡한 멀티스텝
+
 ### permissionMode 값
 `default` | `acceptEdits` | `auto` | `dontAsk` | `bypassPermissions` | `plan`
 - **`plan`은 read-only exploration** — Bash 등 실행 도구 불가
+- `auto` 모드에서 sub-agent frontmatter의 permissionMode는 무시됨 — parent classifier가 결정
+
+### 도구 리네임
+- **`Task` → `Agent`** (v2.1.63). 기존 `Task(...)` 참조는 alias로 계속 동작.
+- `Agent(worker, researcher)` 문법으로 spawnable sub-agent를 제한할 수 있다.
 
 ### 주의
 - **`role:` 필드는 공식 스펙에 없음** — 커스텀 필드는 무시됨
 - `isolation: worktree`는 대상이 **현재 repo**일 때만 의미 — 변경이 없으면 자동 정리
+- Plugin sub-agent에서 `hooks`, `mcpServers`, `permissionMode`는 보안상 무시
 
 ### 적용 규칙
 - PGE 역할은 description 태그로 (`[planner]` / `[generator]` / `[evaluator]`)
@@ -126,17 +146,39 @@
 ## [6] Claude Code: Hooks
 **URL**: https://code.claude.com/docs/en/hooks
 
+### 4종 훅 핸들러 (2026-04 기준)
+- **command**: 기존 shell 스크립트 (bash/python). stdin JSON, exit code 제어.
+- **http**: POST endpoint. non-2xx = non-blocking error; 2xx + decision JSON으로 차단.
+- **prompt**: LLM 평가. prompt 템플릿 + model 필드.
+- **agent**: Sub-agent 검증. model 필드 선택 가능.
+
 ### 공식 hook 이벤트 (전체 목록)
 `SessionStart`, `SessionEnd`, `UserPromptSubmit`, `PreToolUse`, `PostToolUse`, `PostToolUseFailure`, `PermissionRequest`, `PermissionDenied`, `Notification`, `Stop`, `StopFailure`, `SubagentStart`, `SubagentStop`, `TaskCreated`, `TaskCompleted`, `InstructionsLoaded`, `ConfigChange`, `CwdChanged`, `FileChanged`, `WorktreeCreate`, `WorktreeRemove`, `PreCompact`, `PostCompact`, `Elicitation`, `ElicitationResult`, `TeammateIdle`
 
+Matcher patterns: pipe-separated (`Bash|Edit`), event별 의미 차이 (예: `SessionStart` matches `startup`/`resume`/`clear`/`compact`).
+
 ### 입력 규약
-- **입력은 stdin JSON으로만 전달** — `$TOOL_INPUT_FILE_PATH` 같은 환경변수는 **존재하지 않음**
+- **입력은 stdin JSON으로만 전달** — `$TOOL_INPUT_FILE_PATH`는 **존재하지 않음**
+- 단, `$CLAUDE_ENV_FILE`은 SessionStart 훅에서 세션 환경변수 영속에 사용 가능 (공식)
+- 기타 공식 env: `$CLAUDE_PROJECT_DIR`, `${CLAUDE_PLUGIN_ROOT}`, `$CLAUDE_CODE_REMOTE`
 - 공통 필드: `session_id`, `cwd`, `hook_event_name`, `permission_mode`, `tool_name`, `tool_input`, `tool_response`, `agent_type`, `agent_id`, `transcript_path`
 
 ### Exit code 의미
 - `0`: 통과 (SessionStart/UserPromptSubmit은 stdout이 context로 주입)
 - `2`: 차단 + stderr가 Claude에 피드백
 - 기타: non-blocking error (공식 문서 경고: "exit 1은 차단하지 않으므로 정책 시행에는 exit 2 사용")
+
+### PreToolUse 확장
+- `updatedInput`: 도구 입력을 실행 전 수정 가능 (allow/deny 외 제3옵션)
+- `defer` permissionDecision: 외부 UI 대기 후 SDK로 재개
+- `updatedPermissions`: 훅이 세션 권한을 동적 변경 (addRules/replaceRules/removeRules/setMode)
+
+### 추가 필드
+- `if`: 권한 규칙 필터 (`"Bash(git *)"`, `"Edit(*.ts)"`) — 조건부 훅 발화
+- `once`: 세션당 1회만 실행 (skills 전용)
+- `statusMessage`: 훅 실행 중 커스텀 스피너 메시지
+- `asyncRewake`: 백그라운드 비동기 훅, exit 2로 Claude 재기동
+- `disableAllHooks: true`: settings에서 모든 훅 비활성화
 
 ### 적용 규칙
 - bash/python 훅 모두 `cat` / `json.load(sys.stdin)`으로 입력 수신
@@ -147,16 +189,42 @@
 ## [7] Claude Code: Skills
 **URL**: https://code.claude.com/docs/en/skills
 
-### 공식 frontmatter 필드
-`name`, `description`, `argument-hint`, `disable-model-invocation`, `user-invocable`, `allowed-tools`, `model`, `effort`, `context` (`fork`), `agent`, `hooks`, `paths`, `shell`
+### 공식 frontmatter 필드 (2026-04 기준)
+`name`, `description`, `when_to_use`, `argument-hint`, `disable-model-invocation`, `user-invocable`, `allowed-tools`, `model`, `effort`, `context` (`fork`), `agent`, `hooks`, `paths`, `shell`
+
+### 신규/확장 필드 상세
+- `when_to_use`: description에 합산, 자동 트리거 조건 보충. 합산 1,536자 cap.
+- `user-invocable: false`: `/` 메뉴에서 숨김, Claude 자동 호출만 가능
+- `context: fork`: 격리된 sub-agent에서 실행. skill 내용이 sub-agent 프롬프트가 됨
+- `agent`: `context: fork` 시 사용할 sub-agent 타입 (Explore, Plan, general-purpose, 또는 커스텀)
+- `paths`: glob 패턴. 매칭 파일 작업 시만 자동 활성화
+- `hooks`: 스킬 라이프사이클에 스코핑된 훅
+- `shell`: `bash` (기본) 또는 `powershell`
+
+### 문자열 치환
+- `$ARGUMENTS`, `$ARGUMENTS[N]` / `$N` (0-based), `${CLAUDE_SESSION_ID}`, `${CLAUDE_SKILL_DIR}`
+
+### Shell injection
+- `` !`command` `` 또는 ` ```! ` 블록: 렌더 시점에 즉시 실행, 출력이 프롬프트에 주입
+- `disableSkillShellExecution: true` settings로 비활성화 가능
+
+### Skill content lifecycle
+- 호출된 스킬은 세션 끝까지 conversation에 잔류
+- Auto-compaction 후: 가장 최근 호출 스킬부터 각 5,000토큰, 합산 25,000토큰 예산 내 재부착
+
+### Skills는 Agent Skills 오픈 표준(agentskills.io)을 따른다.
+Custom commands(`.claude/commands/`)는 skills로 통합. 기존 commands 파일은 계속 동작.
 
 ### 파일 위치 우선순위
-Enterprise > Personal (`~/.claude/skills/`) > Project (`.claude/skills/`) > Plugin
+Enterprise > Personal (`~/.claude/skills/`) > Project (`.claude/skills/`) > Plugin (`plugin-name:skill-name` namespace)
 
 ### 적용 규칙
 - 파괴적 슬래시 커맨드에는 `disable-model-invocation: true`
 - SKILL.md는 500라인 이하 권장, 큰 참조 자료는 별도 파일로 분리
-- 설명은 앞에 핵심 용도를 두기 — 250자 초과 시 skill 리스트에서 잘림
+- `description` + `when_to_use` 합산 1,536자 초과 시 skill 리스트에서 잘림. 핵심 용도를 앞에 배치.
+- 총 예산은 context window의 1%, fallback 8,000자. `SLASH_COMMAND_TOOL_CHAR_BUDGET` env로 조정.
+- Live change detection: 스킬 디렉토리 변경 시 세션 재시작 없이 즉시 반영 (단 신규 top-level 디렉토리 생성은 재시작 필요)
+- Nested discovery: 모노레포에서 `packages/frontend/.claude/skills/` 자동 검색
 
 ---
 
@@ -372,3 +440,4 @@ URL·본문 재검증 필요. 현재 rules에는 포함하지 않음.
 | 2026-04-13 | 초기 작성 — 7개 URL + 2개 추가 소스 분석 |
 | 2026-04-13 | v2.0 재검증 — 7개 URL + 공식 hooks/skills/settings 4종 원문 대조 후 오매핑 5건 제거, 출처 각주 시스템 도입 |
 | 2026-04-14 | v2.1 — 새 공식 출처 4종 추가: [11] Agent Teams, [12] Agent Skills blog, [13] Claude Agent SDK, [14] Code Execution with MCP. Progressive disclosure / gather-act-verify / code-based orchestration 원칙 rules에 반영 |
+| 2026-04-16 | v2.2 — 14개 URL 전수 재검증(12개 CHANGED, 2개 UNCHANGED). Hooks 4종 핸들러·updatedInput·$CLAUDE_ENV_FILE, Sub-agent 신규 필드 8종·Task→Agent 리네임·빌트인 3종, Skills Agent Skills 오픈 표준화·신규 필드·문자열 치환·shell injection·content lifecycle, Caching automatic/1h TTL, Agent Teams plan approval·task locking·신규 훅 3종, Best Practices /rewind·auto mode·plugins·/btw 반영 |

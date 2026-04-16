@@ -42,11 +42,12 @@ harness-factory (Orchestrator 스킬)
 ## 핵심 컨벤션
 
 - 한국어 중심, 기술 용어는 영어 유지
-- 에이전트 파일: kebab-case.md, 공식 frontmatter 필드만 사용 (name, description, tools, disallowedTools, model, maxTurns, permissionMode, isolation 등)
+- 에이전트 파일: kebab-case.md, 공식 frontmatter 필드만 사용 (name, description, tools, disallowedTools, model, maxTurns, permissionMode, isolation, skills, memory, background, effort 등)
 - PGE 역할은 **description 태그**로 표기: `[planner]` / `[generator]` / `[evaluator]` — `role` 필드는 공식 스펙에 없음
 - 모든 에이전트에 Negative Space 섹션 필수
 - PGE 도구 접근: Planner는 Edit 금지 + Write는 `.nova/contracts/` 한정(훅 강제), Evaluator는 Write/Edit 금지 (permissionMode: default 유지 — plan 모드는 Bash까지 차단)
-- 훅: bash·python 모두 stdin JSON 입력, stdout JSON 출력. `$TOOL_INPUT_FILE_PATH` 같은 환경변수는 공식 스펙에 없음
+- 훅: 4종 핸들러(command/http/prompt/agent). command는 stdin JSON 입력. `$TOOL_INPUT_FILE_PATH`는 비공식. `$CLAUDE_ENV_FILE`은 SessionStart에서 세션 환경변수 영속용
+- `Task` 도구는 `Agent`로 리네임됨 (v2.1.63). 기존 `Task(...)` alias는 동작하지만 신규 코드는 `Agent(...)` 사용
 
 ## 주요 스킬
 
