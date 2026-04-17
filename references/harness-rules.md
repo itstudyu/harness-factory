@@ -1,6 +1,6 @@
 ---
-last_updated: "2026-04-16"
-version: "2.2.0"
+last_updated: "2026-04-17"
+version: "2.2.1"
 sources:
   - https://www.anthropic.com/engineering/managed-agents
   - https://www.anthropic.com/engineering/effective-harnesses-for-long-running-agents
@@ -17,6 +17,7 @@ sources:
   - https://claude.com/blog/building-agents-with-the-claude-agent-sdk
   - https://www.anthropic.com/engineering/code-execution-with-mcp
 notes: |
+  2.2.1 (2026-04-17): 14개 URL 재검증. Caching: Opus 4.7 추가, Haiku 3 최소 토큰 수정. Sub-agents: --agents CLI·SUBAGENT_MODEL env. Hooks: PLUGIN_DATA env. Best Practices: Writer/Reviewer 패턴.
   2.2.0 (2026-04-16): 14개 URL 전수 재검증. Hooks 4종 핸들러·신규 이벤트, Sub-agent 신규 필드 8종, Skills Agent Skills 오픈 표준화·신규 필드, Caching automatic/1h TTL, Agent Teams plan approval·task locking, Best Practices /rewind·auto mode·plugins 반영.
   2.1.0 (2026-04-14): 새 공식 출처 4종 추가 — Agent Teams, Agent Skills Engineering Blog, Claude Agent SDK, Code Execution with MCP.
   2.0.0 (2026-04-13): 7개 URL 원문 대조 후 재작성. 출처 미확인 수치/메타포 제거.
@@ -75,7 +76,7 @@ notes: |
 - **Code Execution with MCP로 토큰 절감.** MCP 도구를 모델 context에 직접 로드하지 않고 `./servers/<name>/` 식 파일 시스템 구조로 노출 → 필요한 것만 on-demand 로드. 한 사례: 10,000행 스프레드시트를 전부 노출하는 대신 코드에서 필터링 → **150,000 → 2,000 토큰 (98.7% 절감)**. [14]
 - **Privacy-preserving intermediate results.** 중간 결과는 실행 환경에만 머물고 명시적으로 로그·반환된 것만 모델로 전달. [14]
 - **Prompt caching 계층.** Cache prefixes는 `tools → system → messages` 순서. 도구 정의가 바뀌면 전체 캐시 무효화 → 도구 목록은 고정. Breakpoint 최대 4개, 자동 lookback window 20 블록. [4]
-- **캐시 비용.** 읽기 = 기본 입력가 × 0.1, 5분 TTL 쓰기 = × 1.25, 1시간 TTL 쓰기 = × 2. Automatic caching(`cache_control` request-level)으로 multi-turn 대화 시 breakpoint를 자동 전진시킬 수 있다. 모델별 최소 캐시 토큰: Opus 4.6/4.5/Haiku 4.5 = 4096, Sonnet 4.6/Haiku 3.5/3 = 2048, Sonnet 4.5/Opus 4.1/4/Sonnet 4/3.7 = 1024. [4]
+- **캐시 비용.** 읽기 = 기본 입력가 × 0.1, 5분 TTL 쓰기 = × 1.25, 1시간 TTL 쓰기 = × 2. Automatic caching(`cache_control` request-level)으로 multi-turn 대화 시 breakpoint를 자동 전진시킬 수 있다. 모델별 최소 캐시 토큰: Opus 4.7/4.6/4.5/Haiku 4.5/Haiku 3 = 4096, Sonnet 4.6/Haiku 3.5 = 2048, Sonnet 4.5/Opus 4.1/4/Sonnet 4/3.7 = 1024. [4]
 - **Agent team 토큰 비용.** 각 teammate는 독립 context window → 토큰 사용이 선형으로 증가. 3–5명이 대부분 워크플로우의 스윗스팟, teammate당 5–6개 태스크. [11]
 
 ## 6. 안티패턴
@@ -189,3 +190,4 @@ INPUT=$(cat)   # 입력은 stdin JSON. $TOOL_INPUT_FILE_PATH는 존재하지 않
 12. Anthropic, *Equipping agents for the real world with Agent Skills* — https://claude.com/blog/equipping-agents-for-the-real-world-with-agent-skills (redirect from `www.anthropic.com/engineering/equipping-agents-for-the-real-world-with-agent-skills`)
 13. Anthropic, *Building agents with the Claude Agent SDK* — https://claude.com/blog/building-agents-with-the-claude-agent-sdk (redirect from `www.anthropic.com/engineering/building-agents-with-the-claude-agent-sdk`)
 14. Anthropic Engineering, *Code execution with MCP: building more efficient AI agents* — https://www.anthropic.com/engineering/code-execution-with-mcp
+15. revfactory/harness — https://github.com/revfactory/harness (Apache-2.0, ★ 2.6k, 2026-04-18 확인). 6가지 아키텍처 패턴(Pipeline/Fan-out/Expert Pool/Producer-Reviewer/Supervisor/Hierarchical Delegation) 정형화. 공식 문서 충돌 시 공식 우선. 후보 repo는 `harness-references.md` [15] 참조

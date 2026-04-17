@@ -8,6 +8,8 @@ description: {{DESCRIPTION_KO}}
 # context: fork                    # 선택. 격리 sub-agent에서 실행
 # agent: Explore                   # context:fork 시 sub-agent 타입
 # paths: "src/**/*.ts"             # 매칭 파일 작업 시만 활성화
+# hooks: {}                        # 선택. 스킬 라이프사이클 훅
+# shell: bash                      # 선택. bash (기본) | powershell
 ---
 
 # {{SKILL_TITLE}}

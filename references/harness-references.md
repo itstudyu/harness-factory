@@ -90,8 +90,8 @@
 - 자동 lookback window = 20 블록
 
 ### 최소 캐시 토큰 (모델별)
-- Opus 4.6 / 4.5 / Haiku 4.5: 4096
-- Sonnet 4.6 / Haiku 3.5 / Haiku 3: 2048
+- Opus 4.7 / 4.6 / 4.5 / Haiku 4.5 / Haiku 3: 4096
+- Sonnet 4.6 / Haiku 3.5: 2048
 - Sonnet 4.5 / Opus 4.1 / Opus 4 / Sonnet 4 / Sonnet 3.7: 1024
 
 ### Cache prefix 생성 순서
@@ -108,6 +108,12 @@
 
 ### 공식 지원 frontmatter 필드 (2026-04 기준)
 `name` (필수), `description` (필수), `tools`, `disallowedTools`, `model`, `permissionMode`, `maxTurns`, `skills`, `mcpServers`, `memory`, `background`, `effort`, `isolation`, `color`, `initialPrompt`, `hooks`
+
+### CLI 정의 sub-agent (`--agents` flag)
+- `--agents` JSON으로 세션 한정 sub-agent 정의 가능 (디스크 미저장)
+- `prompt` key = 파일 기반의 markdown body와 동일
+- 우선순위: Managed > CLI (`--agents`) > Project > User > Plugin
+- `CLAUDE_CODE_SUBAGENT_MODEL` env로 전역 모델 오버라이드
 
 ### 신규/확장 필드 상세
 - `skills`: 스킬 전체 내용을 startup에 프리로드 (Level 2 content 즉시 주입)
@@ -152,15 +158,19 @@
 - **prompt**: LLM 평가. prompt 템플릿 + model 필드.
 - **agent**: Sub-agent 검증. model 필드 선택 가능.
 
-### 공식 hook 이벤트 (전체 목록)
+### 공식 hook 이벤트 (30종 전체 목록)
 `SessionStart`, `SessionEnd`, `UserPromptSubmit`, `PreToolUse`, `PostToolUse`, `PostToolUseFailure`, `PermissionRequest`, `PermissionDenied`, `Notification`, `Stop`, `StopFailure`, `SubagentStart`, `SubagentStop`, `TaskCreated`, `TaskCompleted`, `InstructionsLoaded`, `ConfigChange`, `CwdChanged`, `FileChanged`, `WorktreeCreate`, `WorktreeRemove`, `PreCompact`, `PostCompact`, `Elicitation`, `ElicitationResult`, `TeammateIdle`
+
+### 추가 환경변수
+- `$CLAUDE_PLUGIN_DATA`: 플러그인 persistent data 디렉토리
+- `$CLAUDE_CODE_REMOTE`: 웹 환경에서 `"true"` 설정
 
 Matcher patterns: pipe-separated (`Bash|Edit`), event별 의미 차이 (예: `SessionStart` matches `startup`/`resume`/`clear`/`compact`).
 
 ### 입력 규약
 - **입력은 stdin JSON으로만 전달** — `$TOOL_INPUT_FILE_PATH`는 **존재하지 않음**
 - 단, `$CLAUDE_ENV_FILE`은 SessionStart 훅에서 세션 환경변수 영속에 사용 가능 (공식)
-- 기타 공식 env: `$CLAUDE_PROJECT_DIR`, `${CLAUDE_PLUGIN_ROOT}`, `$CLAUDE_CODE_REMOTE`
+- 기타 공식 env: `$CLAUDE_PROJECT_DIR`, `${CLAUDE_PLUGIN_ROOT}`, `${CLAUDE_PLUGIN_DATA}`, `$CLAUDE_CODE_REMOTE`
 - 공통 필드: `session_id`, `cwd`, `hook_event_name`, `permission_mode`, `tool_name`, `tool_input`, `tool_response`, `agent_type`, `agent_id`, `transcript_path`
 
 ### Exit code 의미
@@ -189,7 +199,7 @@ Matcher patterns: pipe-separated (`Bash|Edit`), event별 의미 차이 (예: `Se
 ## [7] Claude Code: Skills
 **URL**: https://code.claude.com/docs/en/skills
 
-### 공식 frontmatter 필드 (2026-04 기준)
+### 공식 frontmatter 필드 (2026-04 기준, 전체)
 `name`, `description`, `when_to_use`, `argument-hint`, `disable-model-invocation`, `user-invocable`, `allowed-tools`, `model`, `effort`, `context` (`fork`), `agent`, `hooks`, `paths`, `shell`
 
 ### 신규/확장 필드 상세
@@ -240,6 +250,13 @@ Enterprise > Personal (`~/.claude/skills/`) > Project (`.claude/skills/`) > Plug
 
 ### 워크플로우
 Explore → Plan → Code → Commit (4단계)
+
+### 추가 패턴 (2026-04 확인)
+- `/btw`: 컨텍스트에 남지 않는 사이드 질문 (dismissible overlay)
+- `/rewind`: 대화·코드 체크포인트 복원 또는 특정 메시지부터 요약
+- Writer/Reviewer 패턴: 별도 세션으로 코드 작성 ↔ 리뷰 분리 → 자기 평가 편향 방지
+- `--permission-mode auto -p`: 비대화형 실행 시 classifier 기반 자동 승인, 반복 차단 시 abort
+- 플러그인 (`/plugin`): skills·hooks·subagents·MCP를 번들로 설치
 
 ### 적용 규칙
 - **2회 실패 후 컨텍스트 초기화** 규칙의 **정식 출처는 여기** (이전에는 Hashimoto로 잘못 매핑되어 있었음)
@@ -405,6 +422,36 @@ Explore → Plan → Code → Commit (4단계)
 
 ---
 
+## [15] Community Harness Repositories (보조 사례)
+
+공식 출처와 충돌 시 공식 우선. 본 섹션은 **본문 직접 검증된 항목만** 등재한다.
+
+### 등재 기준 (모두 충족)
+- 본문(README/SKILL.md) WebFetch 또는 직접 clone 확인 완료
+- ★ 1k+ / OSS 라이선스 / 식별 가능한 메인테이너
+- 공식 문서로 환원되지 않는 **고유한 개념**을 제공할 것
+
+### 15.1 revfactory/harness
+**URL**: https://github.com/revfactory/harness
+**확인 일자**: 2026-04-18 (WebFetch)
+- ★ 2.6k / Apache-2.0 / Claude Code 플러그인 형태 meta-skill
+- README가 정형화한 **6가지 아키텍처 패턴**: Pipeline, Fan-out/Fan-in, Expert Pool, Producer-Reviewer, Supervisor, Hierarchical Delegation
+- 적용 시사점: harness-factory의 PGE는 Producer-Reviewer 변형으로 매핑 가능
+
+> 본 repo의 A/B 수치(49.5→79.3) 등 성능 주장은 **외부 재현 없음** — rules에는 인용하지 않는다.
+
+### 등재 후보 (본문 미검증, 인용 금지)
+다음 repo들은 검색 결과 description만 확인한 상태. rules에 인용하려면 먼저 본문 검증 필요:
+- `hesreallyhim/awesome-claude-code` — 큐레이션 리스트 (1차 탐색 진입점으로만 사용)
+- `anthropics/skills` — Anthropic 공식 (skills.sh 인스톨 카운트로 인기 확인)
+- `affaan-m/everything-claude-code`, `SethGammon/Citadel`, `wshobson/agents`, `trailofbits/skills`, `langchain-ai/langchain-skills`
+
+### 검증 정책
+- rules로 인용 시 **commit SHA + 직접 인용한 줄 번호** 기록
+- archived / 90일 무활동 → 다음 `/rules-updater` 실행 시 제거
+
+---
+
 ## 추가 소스 (미검증 or 보조)
 
 ### Simon Willison
@@ -428,8 +475,9 @@ URL·본문 재검증 필요. 현재 rules에는 포함하지 않음.
 3. **메이저 AI 기업 엔지니어링 블로그**: OpenAI, Google DeepMind, DeepSeek 공식
 4. **피어 리뷰 / 인용 100회 이상 논문**: arXiv
 5. **메이저 컨퍼런스 발표**: NeurIPS, ICML, ICLR 등
+6. **검증된 GitHub repo** ([15] 참조): ★ 100+ / 90일 내 활동 / OSS 라이선스 / 식별 가능한 메인테이너. 공식 문서와 충돌 시 공식 우선.
 
-**제외**: 익명 블로그, 광고성 콘텐츠, 미검증 Twitter 스레드, 3개월 이상 경과한 beta 관련 자료.
+**제외**: 익명 블로그, 광고성 콘텐츠, 미검증 Twitter 스레드, 3개월 이상 경과한 beta 관련 자료, ★ 100 미만 fork-only repo.
 
 ---
 
@@ -441,3 +489,5 @@ URL·본문 재검증 필요. 현재 rules에는 포함하지 않음.
 | 2026-04-13 | v2.0 재검증 — 7개 URL + 공식 hooks/skills/settings 4종 원문 대조 후 오매핑 5건 제거, 출처 각주 시스템 도입 |
 | 2026-04-14 | v2.1 — 새 공식 출처 4종 추가: [11] Agent Teams, [12] Agent Skills blog, [13] Claude Agent SDK, [14] Code Execution with MCP. Progressive disclosure / gather-act-verify / code-based orchestration 원칙 rules에 반영 |
 | 2026-04-16 | v2.2 — 14개 URL 전수 재검증(12개 CHANGED, 2개 UNCHANGED). Hooks 4종 핸들러·updatedInput·$CLAUDE_ENV_FILE, Sub-agent 신규 필드 8종·Task→Agent 리네임·빌트인 3종, Skills Agent Skills 오픈 표준화·신규 필드·문자열 치환·shell injection·content lifecycle, Caching automatic/1h TTL, Agent Teams plan approval·task locking·신규 훅 3종, Best Practices /rewind·auto mode·plugins·/btw 반영 |
+| 2026-04-17 | v2.2.1 — 14개 URL 재검증. Caching: Opus 4.7 추가(4096), Haiku 3 최소 토큰 2048→4096 수정. Sub-agents: --agents CLI flag·CLAUDE_CODE_SUBAGENT_MODEL env·우선순위 체계. Hooks: $CLAUDE_PLUGIN_DATA env 추가. Best Practices: Writer/Reviewer 패턴·/btw 상세화 |
+| 2026-04-18 | v2.3 — [15] Community Harness Repositories 섹션 신설. 본문 직접 검증된 revfactory/harness만 등재(★ 2.6k, Apache-2.0, 6가지 아키텍처 패턴). 나머지 7개는 "후보(인용 금지)"로만 기록. 판단 기준 6번 추가 |

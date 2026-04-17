@@ -12,6 +12,9 @@ isolation: {{ISOLATION}}
 # memory: project        # 선택. user | project | local → MEMORY.md 자동 생성
 # background: false      # 선택. 백그라운드 태스크로 실행
 # effort: high           # 선택. low | medium | high | max (Opus 4.6 only)
+# color: blue            # 선택. red | blue | green | yellow | purple | orange | pink | cyan
+# initialPrompt: ""      # 선택. --agent 실행 시 첫 턴 자동 제출
+# hooks: {}              # 선택. 에이전트 스코핑 훅
 ---
 
 당신은 {{PROJECT_NAME}}의 **{{ROLE_TITLE}}**이다.

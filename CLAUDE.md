@@ -22,9 +22,15 @@ harness-factory (Orchestrator 스킬)
     │
     ├─▶ harness-architect (Planner)  — Flipped Interaction → 설계 문서
     ├─▶ harness-generator (Generator / Worker) — 템플릿 기반 파일 생성
-    └─▶ harness-auditor  (Evaluator)  — 12항목 rubric으로 바이너리 판정
+    └─▶ harness-auditor  (Evaluator)  — 12+1 rubric으로 바이너리 판정
                     │
                     └─ FAIL → Generator 재위임 (최대 2회, Evaluator-Optimizer 루프)
+
+harness-upgrade (Orchestrator 스킬)
+    │
+    ├─▶ harness-diff-reporter (Evaluator) — severity 진단 리포트
+    ├─▶ harness-upgrader (Generator)      — worktree patch 적용
+    └─▶ harness-auditor  (Evaluator)      — 12+1+2 rubric 검수
 ```
 
 ## 디렉토리 구조
@@ -42,7 +48,7 @@ harness-factory (Orchestrator 스킬)
 ## 핵심 컨벤션
 
 - 한국어 중심, 기술 용어는 영어 유지
-- 에이전트 파일: kebab-case.md, 공식 frontmatter 필드만 사용 (name, description, tools, disallowedTools, model, maxTurns, permissionMode, isolation, skills, memory, background, effort 등)
+- 에이전트 파일: kebab-case.md, 공식 frontmatter 필드만 사용 (name, description, tools, disallowedTools, model, maxTurns, permissionMode, isolation, skills, memory, background, effort, color, initialPrompt, hooks 등)
 - PGE 역할은 **description 태그**로 표기: `[planner]` / `[generator]` / `[evaluator]` — `role` 필드는 공식 스펙에 없음
 - 모든 에이전트에 Negative Space 섹션 필수
 - PGE 도구 접근: Planner는 Edit 금지 + Write는 `.nova/contracts/` 한정(훅 강제), Evaluator는 Write/Edit 금지 (permissionMode: default 유지 — plan 모드는 Bash까지 차단)
