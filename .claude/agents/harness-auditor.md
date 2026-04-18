@@ -62,6 +62,7 @@ permissionMode: default
 | 10 | 훅 | settings 등록 | HIGH | `settings.json` 또는 `settings.local.json`에 등록 |
 | 11 | Placeholder | 잔여 | HIGH | `{{UPPER}}`/`{대상경로}`/`{프로젝트명}` 0건 |
 | 12 | JSON | 유효성 | HIGH | 모든 `.json` 유효 |
+| 13 | 인용 무결성 | community-repo SHA/줄 | MEDIUM | rules에 등재된 GitHub repo 링크가 본문 내에서 재인용될 때 `blob/<SHA>/...#L..` 형태로 SHA·줄 번호 고정. 인용 자체가 없으면 SKIP. |
 | bonus | Frontmatter | 공식 필드만 | HIGH | `role:` 등 비공식 필드 없음 |
 
 ### 업그레이드 확장 rubric (`.nova/contracts/upgrade-report.md` 존재 시에만)
@@ -208,6 +209,31 @@ for root,_,files in os.walk("."):
             p = os.path.join(root,f)
             try: json.load(open(p, encoding="utf-8"))
             except Exception as e: fail(12, f"{p} — {e}")
+
+# 체크 13: community-repo 인용 무결성
+# rules에 등재된 GitHub repo 링크가 본문(rules 외)에서 재인용될 때 SHA + 줄 번호 고정 여부
+rules_path = "references/harness-rules.md"
+community_repos = set()
+if os.path.isfile(rules_path):
+    rules_text = open(rules_path, encoding="utf-8").read()
+    for m in re.finditer(r"https?://github\.com/([^/\s)]+/[^/\s)]+)", rules_text):
+        community_repos.add(m.group(1).rstrip(".,);"))
+if community_repos:
+    bare_link = re.compile(r"https?://github\.com/([^/\s)]+/[^/\s)]+)(?!/blob/[0-9a-f]{7,40}/[^\s)]*#L\d)")
+    for root,_,files in os.walk("."):
+        if any(x in root for x in (".git", "node_modules", "/references", ".claude/worktrees")): continue
+        for f in files:
+            if not f.endswith((".md",)): continue
+            p = os.path.join(root,f)
+            if p == "./" + rules_path or p.endswith("/harness-references.md"): continue
+            try: text = open(p, encoding="utf-8", errors="ignore").read()
+            except: continue
+            for ln_no, ln in enumerate(text.splitlines(), 1):
+                for repo in community_repos:
+                    if repo in ln and "blob/" not in ln:
+                        # bare repo URL 인용은 OK (홈페이지 링크). #L 줄번호 인용을 시도하면서 SHA 미고정인 케이스만 FAIL
+                        if "#L" in ln and not re.search(r"blob/[0-9a-f]{7,40}/[^\s)]*#L\d", ln):
+                            fail(13, f"{p}:{ln_no} — {repo} 인용에 SHA/줄 번호 고정 누락")
 
 # ext rubric (UPGRADE_MODE일 때만)
 if UPGRADE_MODE:

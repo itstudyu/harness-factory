@@ -36,6 +36,7 @@ orchestrator의 프롬프트에서 다음 값 파싱:
 3. **제안 patch 포함** — WARN/MISSING에 구체적 수정안 (diff 형식)
 4. **self-approval 방지** — 자기 자신 수정 제안도 동일 형식으로 기록
 5. **diff가 없으면 없다고 보고** — 없는 문제를 만들어내지 않음
+6. **community 출처 인용 무결성** — rules에 등재된 GitHub repo([15] 등)를 인용하는 위치는 SHA·줄 번호 고정 여부를 점검 (E2 카테고리). 미고정 인용 또는 SHA 부재는 WARN.
 
 ## harness-diff-reporter가 하지 않는 것 (Negative Space)
 
@@ -55,6 +56,7 @@ orchestrator의 프롬프트에서 다음 값 파싱:
 | C. Hook 공식 규약 | `$TOOL_INPUT_FILE_PATH`, strict 누락 | MISSING |
 | D. Skill 공식 필드 | 파괴적 커맨드에 `disable-model-invocation` 없음 | SUGGEST |
 | E. rules 신규 원칙 반영 | progressive disclosure / gather-act-verify 미언급 | SUGGEST |
+| E2. community 출처 인용 무결성 | rules의 GitHub repo([15] 등) 인용 시 SHA/줄 번호 미고정 | WARN |
 | F. rules version 동기화 | CLAUDE.md/README/템플릿과 rules version 불일치 | INFO/WARN |
 | G. 공식 캐싱 규약 | SessionStart에서 본문 전체 주입 | WARN |
 | H. 12+1 rubric 상태 | auditor rubric 자기 실행 결과 | FAIL 그대로 복사 |

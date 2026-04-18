@@ -97,7 +97,9 @@ Context:
   - HARNESS_TARGET: {절대경로}
   - FACTORY_ROOT: {절대경로}
   (reporter는 읽기 전용 — Write/Edit 금지. 파일 저장은 orchestrator가 담당.)
-Constraints: severity 분류, 근거 rules 각주, 제안 patch
+Constraints:
+  - severity 분류, 근거 rules 각주, 제안 patch
+  - **[15] 일관성 점검**: rules에 등재된 community repo([15] 등 GitHub 출처)가 워크플로우/에이전트/스킬에 반영됐는지 카테고리 E2(community 출처 인용 무결성)로 보고. SHA/줄 번호 미고정 인용은 WARN.
 Expected Output: stdout에 리포트 본문 전체 + 마지막에 `===SUMMARY===` 블록
 Success Criteria: 모든 항목에 severity + 근거 + 제안 patch
 Related Known Issues: rules 자체 수정 제안 금지

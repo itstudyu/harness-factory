@@ -127,7 +127,64 @@ trusted_domains:
     - huggingface.co/blog
   papers:
     - arxiv.org  # 인용 100회 이상 권장
+  community_repos:
+    - github.com  # 섹션 G 절차로 등재. ★ 1k 이상 + 활발한 유지보수 권장
 ```
+
+## G. GitHub repo 등재 절차
+
+`KIND=community_repo`로 판별된 GitHub 저장소를 references/rules에 추가할 때만 사용한다.
+
+### G.1 사전 검증
+
+```bash
+URL="{후보_URL}"  # https://github.com/{owner}/{repo}
+OWNER_REPO=$(echo "$URL" | sed -E 's|https?://github.com/([^/]+/[^/]+).*|\1|')
+
+# 메타데이터 수집 (gh CLI 우선, 없으면 API 직접 호출)
+if command -v gh &>/dev/null; then
+  gh repo view "$OWNER_REPO" --json name,stargazerCount,licenseInfo,pushedAt,defaultBranchRef
+else
+  curl -sSL "https://api.github.com/repos/$OWNER_REPO" \
+    | python3 -c 'import json,sys; d=json.load(sys.stdin); print({k:d.get(k) for k in ["full_name","stargazers_count","license","pushed_at","default_branch"]})'
+fi
+```
+
+기준:
+- ★ 1,000 이상 권장 (예외 시 사유 명시)
+- license가 OSI-approved (Apache-2.0/MIT/BSD/MPL 등). proprietary/no-license는 거절
+- 최근 6개월 내 commit (pushed_at 확인)
+- README가 영어 또는 한국어로 명확한 아키텍처 설명 포함
+
+### G.2 인용 무결성 — SHA + 줄 번호 고정
+
+community repo는 main 브랜치가 변경되므로 인용 시 **commit SHA + 파일 경로 + 줄 번호**를 고정한다:
+
+```bash
+# 최신 default branch의 HEAD SHA
+SHA=$(curl -sSL "https://api.github.com/repos/$OWNER_REPO/commits/HEAD" \
+      | python3 -c 'import json,sys; print(json.load(sys.stdin)["sha"][:7])')
+
+# permalink 형식 (줄 번호 포함)
+echo "https://github.com/$OWNER_REPO/blob/$SHA/path/to/file.md#L10-L25"
+```
+
+references에 기록할 때:
+
+```markdown
+15. {owner}/{repo} — https://github.com/{owner}/{repo} ({license}, ★ {stars}, {YYYY-MM-DD} 확인 @ {SHA}). {핵심 요약}. 공식 문서 충돌 시 공식 우선.
+```
+
+### G.3 충돌 정책
+
+- 공식 문서(anthropic.com / code.claude.com 등)와 충돌하면 **공식이 우선**
+- community repo의 패턴이 공식 스펙을 보강(공식이 침묵)하는 경우에만 rules에 반영
+- 인용 시 항상 "공식 문서 충돌 시 공식 우선" 문구를 함께 명시
+
+### G.4 갱신 주기
+
+- 모드 1(전체 갱신) 실행 시 community_repo 항목은 **SHA를 다시 fetch**해 변경 감지
+- SHA가 바뀐 경우 인용한 줄 번호의 의미 변화 여부를 수동 확인 후 references 업데이트
 
 ## 보고 형식
 
