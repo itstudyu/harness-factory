@@ -9,7 +9,7 @@
   "max_retries": 2,
   "last_phase": null,
   "upgrade_attempts": 0,
-  "last_upgrade_at": null,
-  "upgrade_started_at": null,
+  "last_upgrade_at": "2026-04-17",
+  "upgrade_started_at": "2026-04-17",
   "features": []
 }

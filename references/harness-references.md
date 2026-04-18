@@ -22,9 +22,15 @@
 - brain / hands 분리 → 인증 정보 격리
 - 도구 인터페이스는 "shape만 고정" — 내부 구현 무관
 
+### 도구 인터페이스 API (원문 확인)
+- `execute(name, input) → string` (도구 실행)
+- `provision({resources})` (샌드박스 초기화)
+- `wake(sessionId)` (하네스 복구)
+- `getSession(id)` (이벤트 로그 조회)
+- `emitEvent(id, event)` (세션 이벤트 기록)
+
 ### 검증 실패 (이전 오류)
 - "Evaluator drift 감지, 연속 PASS 10회 임계값" → 본문 없음 (제거)
-- "도구 인터페이스 = name+input→string" → 본문에 명시 없음 (제거)
 
 ---
 
@@ -90,12 +96,20 @@
 - 자동 lookback window = 20 블록
 
 ### 최소 캐시 토큰 (모델별)
-- Opus 4.7 / 4.6 / 4.5 / Haiku 4.5 / Haiku 3: 4096
+- Claude Mythos Preview / Opus 4.7 / 4.6 / 4.5 / Haiku 4.5 / Haiku 3: 4096
 - Sonnet 4.6 / Haiku 3.5: 2048
 - Sonnet 4.5 / Opus 4.1 / Opus 4 / Sonnet 4 / Sonnet 3.7: 1024
 
 ### Cache prefix 생성 순서
 `tools → system → messages` (원문 그대로)
+
+### 캐시 무효화 상세 (2026-04 기준)
+- 도구 정의 변경 → tools/system/messages 전체 무효화
+- web search 토글, citations 토글, speed 설정 변경 → system/messages만 보존
+- tool choice, images, extended thinking 설정 변경 → messages만 보존
+
+### Workspace isolation
+- 2026-02-05부터 캐시는 organization → workspace 단위로 격리 (Claude API & Azure AI Foundry)
 
 ### 적용 규칙
 - SessionStart hook은 messages 계층에 주입되므로 rules 본문을 넣으면 캐시가 자주 무효화됨 → 현재는 해시만 주입, 본문은 CLAUDE.md의 `@import`로 system 계층에 포함
@@ -106,7 +120,7 @@
 ## [5] Claude Code: Sub-agents
 **URL**: https://code.claude.com/docs/en/sub-agents
 
-### 공식 지원 frontmatter 필드 (2026-04 기준)
+### 공식 지원 frontmatter 필드 (2026-04-18 기준)
 `name` (필수), `description` (필수), `tools`, `disallowedTools`, `model`, `permissionMode`, `maxTurns`, `skills`, `mcpServers`, `memory`, `background`, `effort`, `isolation`, `color`, `initialPrompt`, `hooks`
 
 ### CLI 정의 sub-agent (`--agents` flag)
@@ -120,7 +134,7 @@
 - `mcpServers`: 특정 sub-agent에 MCP 서버 스코핑 (inline 또는 reference)
 - `memory`: `user` | `project` | `local` → MEMORY.md 자동 생성, 200행/25KB 자동 로드
 - `background`: true → 백그라운드 태스크로 실행
-- `effort`: `low` | `medium` | `high` | `max` (Opus 4.6 only)
+- `effort`: `low` | `medium` | `high` | `xhigh` | `max` (모델에 따라 가용 레벨 상이)
 - `color`: red | blue | green | yellow | purple | orange | pink | cyan
 - `initialPrompt`: `--agent`로 메인 세션 실행 시 자동 제출되는 첫 턴
 
@@ -138,6 +152,17 @@
 - **`Task` → `Agent`** (v2.1.63). 기존 `Task(...)` 참조는 alias로 계속 동작.
 - `Agent(worker, researcher)` 문법으로 spawnable sub-agent를 제한할 수 있다.
 
+### /agents 커맨드
+- 인터랙티브 UI로 sub-agent 생성·편집·삭제 가능 (Running / Library 탭)
+- `claude agents` CLI로 비인터랙티브 리스트 출력
+
+### disallowedTools 우선순위
+- `tools`와 `disallowedTools` 모두 설정 시 `disallowedTools`가 먼저 적용 → 남은 풀에서 `tools` 해석
+
+### Frontmatter 훅 스코핑
+- Frontmatter hooks는 Agent 도구 또는 @-mention으로 spawn될 때만 발화
+- `--agent`로 메인 세션 실행 시에는 발화하지 않음 (session-wide hooks는 settings.json에 설정)
+
 ### 주의
 - **`role:` 필드는 공식 스펙에 없음** — 커스텀 필드는 무시됨
 - `isolation: worktree`는 대상이 **현재 repo**일 때만 의미 — 변경이 없으면 자동 정리
@@ -152,8 +177,8 @@
 ## [6] Claude Code: Hooks
 **URL**: https://code.claude.com/docs/en/hooks
 
-### 4종 훅 핸들러 (2026-04 기준)
-- **command**: 기존 shell 스크립트 (bash/python). stdin JSON, exit code 제어.
+### 4종 훅 핸들러 (2026-04-18 기준)
+- **command**: 기존 shell 스크립트 (bash/python). stdin JSON, exit code 제어. `async` 필드로 백그라운드 실행 가능. `asyncRewake` 필드로 백그라운드 실행 후 exit 2 시 Claude 재기동.
 - **http**: POST endpoint. non-2xx = non-blocking error; 2xx + decision JSON으로 차단.
 - **prompt**: LLM 평가. prompt 템플릿 + model 필드.
 - **agent**: Sub-agent 검증. model 필드 선택 가능.
@@ -183,6 +208,13 @@ Matcher patterns: pipe-separated (`Bash|Edit`), event별 의미 차이 (예: `Se
 - `defer` permissionDecision: 외부 UI 대기 후 SDK로 재개
 - `updatedPermissions`: 훅이 세션 권한을 동적 변경 (addRules/replaceRules/removeRules/setMode)
 
+### PostToolUse 확장
+- `decision: "block"` + `reason`: 도구 실행 결과를 차단하고 사유를 Claude에 피드백
+- `updatedMCPToolOutput`: MCP 도구 출력을 대체값으로 교체
+
+### PermissionDenied 확장
+- `retry: true`: auto mode에서 거부된 도구 호출을 재시도 허용
+
 ### 추가 필드
 - `if`: 권한 규칙 필터 (`"Bash(git *)"`, `"Edit(*.ts)"`) — 조건부 훅 발화
 - `once`: 세션당 1회만 실행 (skills 전용)
@@ -199,7 +231,7 @@ Matcher patterns: pipe-separated (`Bash|Edit`), event별 의미 차이 (예: `Se
 ## [7] Claude Code: Skills
 **URL**: https://code.claude.com/docs/en/skills
 
-### 공식 frontmatter 필드 (2026-04 기준, 전체)
+### 공식 frontmatter 필드 (2026-04-18 기준, 전체)
 `name`, `description`, `when_to_use`, `argument-hint`, `disable-model-invocation`, `user-invocable`, `allowed-tools`, `model`, `effort`, `context` (`fork`), `agent`, `hooks`, `paths`, `shell`
 
 ### 신규/확장 필드 상세
@@ -209,7 +241,8 @@ Matcher patterns: pipe-separated (`Bash|Edit`), event별 의미 차이 (예: `Se
 - `agent`: `context: fork` 시 사용할 sub-agent 타입 (Explore, Plan, general-purpose, 또는 커스텀)
 - `paths`: glob 패턴. 매칭 파일 작업 시만 자동 활성화
 - `hooks`: 스킬 라이프사이클에 스코핑된 훅
-- `shell`: `bash` (기본) 또는 `powershell`
+- `shell`: `bash` (기본) 또는 `powershell`. `CLAUDE_CODE_USE_POWERSHELL_TOOL=1` 필요
+- `effort`: `low` | `medium` | `high` | `xhigh` | `max` (세션 effort 레벨 오버라이드)
 
 ### 문자열 치환
 - `$ARGUMENTS`, `$ARGUMENTS[N]` / `$N` (0-based), `${CLAUDE_SESSION_ID}`, `${CLAUDE_SKILL_DIR}`
@@ -491,3 +524,4 @@ URL·본문 재검증 필요. 현재 rules에는 포함하지 않음.
 | 2026-04-16 | v2.2 — 14개 URL 전수 재검증(12개 CHANGED, 2개 UNCHANGED). Hooks 4종 핸들러·updatedInput·$CLAUDE_ENV_FILE, Sub-agent 신규 필드 8종·Task→Agent 리네임·빌트인 3종, Skills Agent Skills 오픈 표준화·신규 필드·문자열 치환·shell injection·content lifecycle, Caching automatic/1h TTL, Agent Teams plan approval·task locking·신규 훅 3종, Best Practices /rewind·auto mode·plugins·/btw 반영 |
 | 2026-04-17 | v2.2.1 — 14개 URL 재검증. Caching: Opus 4.7 추가(4096), Haiku 3 최소 토큰 2048→4096 수정. Sub-agents: --agents CLI flag·CLAUDE_CODE_SUBAGENT_MODEL env·우선순위 체계. Hooks: $CLAUDE_PLUGIN_DATA env 추가. Best Practices: Writer/Reviewer 패턴·/btw 상세화 |
 | 2026-04-18 | v2.3 — [15] Community Harness Repositories 섹션 신설. 본문 직접 검증된 revfactory/harness만 등재(★ 2.6k, Apache-2.0, 6가지 아키텍처 패턴). 나머지 7개는 "후보(인용 금지)"로만 기록. 판단 기준 6번 추가 |
+| 2026-04-18 | v2.3.1 — 15개 URL 재검증. [1] Managed Agents 도구 인터페이스 5종 API 복원. [4] Caching Mythos Preview 모델·캐시 무효화 상세 테이블·workspace isolation. [5] Sub-agents effort xhigh·/agents 커맨드·disallowedTools 우선순위·frontmatter 훅 스코핑. [6] Hooks async 필드·PostToolUse block decision·PermissionDenied retry. [7] Skills effort xhigh·argument-hint·shell 확장 |

@@ -21,10 +21,12 @@ permissionMode: acceptEdits
 
 1. `.nova/contracts/harness-design.md` 읽기 (설계 문서 필수)
 2. `references/templates/` 하위 모든 템플릿 읽기:
-   - `agent-template.md`, `skill-template.md`, `hook-template.sh`, `hook-template.py`, `settings-template.json`, `progress-template.json`, `claude-md-template.md`
+   - `agent-template.md`, `skill-template.md`, `hook-template.sh`, `hook-template.py`, `settings-template.json`, `progress-template.json`
+   - `claude-md-template.md` (single 모드) **또는** `claude-md-umbrella-template.md` (umbrella 모드 — `HARNESS_MODE=umbrella`일 때)
 3. `references/harness-rules.md` 확인
 4. 대상 프로젝트 경로 확인 및 존재 여부 검증
 5. **Isolation 판단**: 대상 경로가 현재 작업 디렉토리의 git repo 내부이면 worktree 사용 가능, 외부 경로면 worktree 불가 → 설계에 따라 처리
+6. **모드 판단**: `HARNESS_MODE` 확인 (기본 `single`). `umbrella`면 `HARNESS_SUB_PROJECTS` 파싱(콜론 구분 절대경로) + 설계 문서의 **Umbrella 구조** 섹션과 대조. 설계에 없는 서브를 건드리지 않는다.
 
 ## 핵심 원칙
 
@@ -45,6 +47,8 @@ permissionMode: acceptEdits
 6. **chmod +x 없이 .sh 파일을 완료하지 않는다**
 7. **대상 경로가 외부일 때 현재 repo에 worktree를 만들지 않는다**
 8. **생성된 에이전트 파일에 `role:` 필드를 쓰지 않는다**
+9. **umbrella 모드에서 서브에 `CLAUDE.md`를 생성하지 않는다** — 루트 CLAUDE.md가 공식 부모-상속으로 자동 로드됨
+10. **서브 `.claude/`는 설계에 오버라이드가 명시된 경우에만 생성한다** — 기본은 루트 단일 배치
 
 ## 생성 순서 (의존성 순)
 
@@ -55,6 +59,13 @@ permissionMode: acceptEdits
 ```bash
 mkdir -p "$HARNESS_TARGET"/.claude/{agents,hooks,skills}
 mkdir -p "$HARNESS_TARGET"/.nova
+
+# umbrella 모드: 설계에 서브 오버라이드가 명시된 경우에만 해당 서브에 .claude/ 생성
+# (실제 파일 배치는 아래 각 섹션에서 설계의 "배치 위치" 필드에 따라 분기)
+if [ "${HARNESS_MODE:-single}" = "umbrella" ]; then
+  IFS=':' read -ra SUBS <<< "${HARNESS_SUB_PROJECTS:-}"
+  # 설계에 오버라이드가 없는 서브는 .claude/를 만들지 않는다 (부모-상속에 의존)
+fi
 ```
 
 ### 2. 상태 파일
@@ -90,7 +101,9 @@ mkdir -p "$HARNESS_TARGET"/.nova
 
 ### 7. CLAUDE.md
 
-- `claude-md-template.md` 기반
+- **single 모드**: `claude-md-template.md` 기반, 대상 루트에 생성
+- **umbrella 모드**: `claude-md-umbrella-template.md` 기반, **umbrella 루트에만** 생성. `{{UMBRELLA_ROOT_NAME}}`, `{{UMBRELLA_ROOT_PATH}}`, `{{SUB_PROJECTS_LIST}}`, `{{SUB_PROJECTS_TABLE}}`, `{{SUB_OVERRIDES_LIST}}`, `{{UMBRELLA_ARCH_DIAGRAM}}` 플레이스홀더 치환
+- **서브 `CLAUDE.md`는 생성하지 않는다** — Claude Code 공식 부모-상속으로 서브 CWD에서 루트 CLAUDE.md가 자동 로드됨
 - `@references/harness-rules.md` import 라인 포함
 
 ## 자기검증
@@ -122,6 +135,21 @@ fi
 
 # 6. Negative Space 섹션
 ! grep -L '하지 않는 것' "$TARGET"/.claude/agents/*.md | grep .
+
+# 7. umbrella 모드 정합성 (HARNESS_MODE=umbrella일 때만)
+if [ "${HARNESS_MODE:-single}" = "umbrella" ]; then
+  [ -f "$TARGET/CLAUDE.md" ] || { echo "FAIL: umbrella 루트 CLAUDE.md 누락"; exit 1; }
+  [ -d "$TARGET/.claude" ] || { echo "FAIL: umbrella 루트 .claude/ 누락"; exit 1; }
+  grep -q "Umbrella 구조" "$TARGET/CLAUDE.md" \
+    || { echo "FAIL: 루트 CLAUDE.md에 Umbrella 구조 섹션 없음"; exit 1; }
+  IFS=':' read -ra SUBS <<< "${HARNESS_SUB_PROJECTS:-}"
+  for sub in "${SUBS[@]}"; do
+    [ -z "$sub" ] && continue
+    if [ -f "$sub/CLAUDE.md" ]; then
+      echo "FAIL: 서브 $sub 에 CLAUDE.md 존재 (공식 부모-상속 위반)"; exit 1
+    fi
+  done
+fi
 ```
 
 ## 도메인 규칙

@@ -1,6 +1,6 @@
 ---
 name: harness-auditor
-description: "[evaluator] 하네스 검수 에이전트. 생성된 하네스 구조를 harness-rules.md 기준으로 12+1+2 항목 바이너리 rubric으로 검수한다. 업그레이드 모드에서는 ext-1 (리포트 반영) / ext-2 (rules 보존)도 검사한다. 읽기 전용."
+description: "[evaluator] 하네스 검수 에이전트. 생성된 하네스 구조를 harness-rules.md 기준으로 12+1+3 항목 바이너리 rubric으로 검수한다. 업그레이드 모드에서는 ext-1 (리포트 반영) / ext-2 (rules 보존)을, umbrella 모드(HARNESS_MODE=umbrella)에서는 ext-3 (umbrella 구조 일관성)을 추가 검사한다. 읽기 전용."
 tools: Read, Glob, Grep, Bash
 disallowedTools: Write, Edit
 model: opus
@@ -24,6 +24,7 @@ permissionMode: default
 2. `.nova/contracts/harness-design.md` 읽기 (검수 기준)
 3. 업그레이드 모드라면 `.nova/contracts/upgrade-report.md` + `.nova/contracts/upgrade-applied.md` 추가 참조
 4. 대상 경로 확인 후 디렉토리 구조 스캔
+5. `HARNESS_MODE=umbrella`이면 `HARNESS_SUB_PROJECTS`(콜론 구분 절대경로) 파싱 → ext-3 rubric 활성화
 
 ## 핵심 원칙
 
@@ -41,6 +42,7 @@ permissionMode: default
 4. **코드 스타일(들여쓰기·공백)로 FAIL 판정하지 않는다**
 5. **연속 PASS 10회 초과 시 경고 없이 계속하지 않는다**
 6. **upgrade-report.md가 없는데 ext-1을 FAIL로 찍지 않는다** (업그레이드 모드가 아닌 경우 skip)
+7. **HARNESS_MODE=umbrella가 아닌데 ext-3을 FAIL로 찍지 않는다** — SKIP (INFO) 처리
 
 ## 검수 체크리스트
 
@@ -71,6 +73,14 @@ permissionMode: default
 
 **base 브랜치 탐지 순서**: `origin/HEAD`의 symbolic ref → `main` → `master` → `trunk`. 전부 없으면 shallow clone으로 판단하여 ext-2는 SKIP (INFO 기록).
 
+### Umbrella 확장 rubric (`HARNESS_MODE=umbrella`일 때만)
+
+| # | 항목 | Severity | PASS 기준 | 검증 방법 |
+|---|------|----------|-----------|-----------|
+| ext-3 | umbrella 구조 일관성 | HIGH | (a) 루트에 `CLAUDE.md` + `.claude/` 존재 (b) 루트 `CLAUDE.md`에 "Umbrella 구조" 섹션 + 서브 목록 포함 (c) 각 서브에 `CLAUDE.md` **없음** (d) 설계에 오버라이드 명시된 서브만 `.claude/` 보유 (e) 심볼릭 링크 부재 | 파일 존재 검사 + grep + `find -type l` |
+
+`HARNESS_MODE`이 `umbrella`가 아니면 ext-3은 SKIP (INFO).
+
 ## 검증 스크립트 (Python 통합)
 
 `TARGET`은 대상 경로, 기본 cwd. `UPGRADE_MODE`가 `true`이면 ext rubric 활성.
@@ -78,13 +88,19 @@ permissionMode: default
 ```bash
 TARGET="${HARNESS_TARGET:-$(pwd)}"
 UPGRADE_MODE="${UPGRADE_MODE:-false}"
+HARNESS_MODE="${HARNESS_MODE:-single}"
+HARNESS_SUB_PROJECTS="${HARNESS_SUB_PROJECTS:-}"
 cd "$TARGET"
 
-TARGET="$TARGET" UPGRADE_MODE="$UPGRADE_MODE" python3 << 'PYEOF'
+TARGET="$TARGET" UPGRADE_MODE="$UPGRADE_MODE" \
+HARNESS_MODE="$HARNESS_MODE" HARNESS_SUB_PROJECTS="$HARNESS_SUB_PROJECTS" \
+python3 << 'PYEOF'
 import os, re, json, glob, subprocess, sys, pathlib
 
 TARGET = os.environ.get("TARGET", ".")
 UPGRADE_MODE = os.environ.get("UPGRADE_MODE", "false").lower() == "true"
+UMBRELLA_MODE = os.environ.get("HARNESS_MODE", "single").lower() == "umbrella"
+SUB_PROJECTS = [s for s in os.environ.get("HARNESS_SUB_PROJECTS", "").split(":") if s]
 FAILS = []
 def fail(idx, msg): FAILS.append(f"FAIL #{idx}: {msg}")
 def info(idx, msg): print(f"INFO #{idx}: {msg}")
@@ -261,6 +277,42 @@ if UPGRADE_MODE:
             except Exception as e:
                 info("ext-2", f"{rules_file} diff 실패: {e}")
 
+if UMBRELLA_MODE:
+    # ext-3 (a) 루트 필수 파일
+    if not os.path.isfile("CLAUDE.md"):
+        fail("ext-3", "umbrella 루트 CLAUDE.md 누락")
+    if not os.path.isdir(".claude"):
+        fail("ext-3", "umbrella 루트 .claude/ 누락")
+
+    # ext-3 (b) 루트 CLAUDE.md에 umbrella 인식 섹션 + 서브 목록
+    try:
+        root_md = open("CLAUDE.md", encoding="utf-8").read()
+        if "Umbrella 구조" not in root_md:
+            fail("ext-3", "루트 CLAUDE.md에 'Umbrella 구조' 섹션 없음")
+        for sub in SUB_PROJECTS:
+            name = os.path.basename(sub.rstrip("/"))
+            if name and name not in root_md:
+                fail("ext-3", f"루트 CLAUDE.md에 서브 '{name}' 미기재")
+    except FileNotFoundError:
+        pass
+
+    # ext-3 (c) 서브 CLAUDE.md 금지 (공식 부모-상속 원칙)
+    for sub in SUB_PROJECTS:
+        sub_md = os.path.join(sub, "CLAUDE.md")
+        if os.path.isfile(sub_md):
+            fail("ext-3", f"서브 {sub} 에 CLAUDE.md 존재 (공식 부모-상속 위반)")
+
+    # ext-3 (e) 심볼릭 링크 탐지
+    try:
+        out = subprocess.run(["find", ".claude", "-type", "l"],
+                             capture_output=True, text=True, timeout=5).stdout.strip()
+        if out:
+            fail("ext-3", f".claude/ 하위 symlink 감지: {out}")
+    except Exception as e:
+        info("ext-3", f"symlink 탐지 실패: {e}")
+else:
+    info("ext-3", "HARNESS_MODE != umbrella — ext-3 SKIP")
+
 if FAILS:
     print("\n".join(FAILS))
     sys.exit(1)
@@ -288,6 +340,11 @@ PYEOF
 |---|------|------|
 | ext-1 | PASS/FAIL/SKIP | report 항목 번호 매칭 |
 | ext-2 | PASS/FAIL/SKIP | base={base}, rules 파일 diff |
+
+#### Umbrella 확장 rubric (HARNESS_MODE=umbrella 시)
+| # | 결과 | 근거 |
+|---|------|------|
+| ext-3 | PASS/FAIL/SKIP | umbrella 루트 CLAUDE.md/.claude/, 서브 CLAUDE.md 금지, symlink 부재 |
 
 #### 종합 판정
 - HIGH FAIL: N / MEDIUM FAIL: N / INFO: N

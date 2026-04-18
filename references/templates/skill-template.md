@@ -2,9 +2,12 @@
 name: {{SKILL_NAME}}
 description: {{DESCRIPTION_KO}}
 # when_to_use: 트리거 조건 보충 (description에 합산, 1536자 cap)
+# argument-hint: "[인자]"          # 선택. 자동완성 시 인자 힌트
 # disable-model-invocation: true   # 파괴적 커맨드 전용
 # user-invocable: true             # false → / 메뉴 숨김, Claude만 호출
 # allowed-tools: Bash(git *) Read  # 선택
+# model: sonnet                    # 선택. 스킬 활성 시 모델
+# effort: high                     # 선택. low | medium | high | xhigh | max
 # context: fork                    # 선택. 격리 sub-agent에서 실행
 # agent: Explore                   # context:fork 시 sub-agent 타입
 # paths: "src/**/*.ts"             # 매칭 파일 작업 시만 활성화

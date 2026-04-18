@@ -16,6 +16,27 @@ disable-model-invocation: true
 
 ## 절차
 
+### 0. 출처 유형 판별
+
+새 URL이나 자동 검색 결과를 처리할 때 먼저 출처 유형을 분기한다:
+
+```bash
+URL="{후보_URL}"
+case "$URL" in
+  *github.com/*/*)
+    KIND="community_repo"   # GitHub 저장소 → 섹션 G 절차
+    ;;
+  *anthropic.com*|*docs.anthropic.com*|*platform.claude.com*|*code.claude.com*|*openai.com*|*deepmind.google*)
+    KIND="official"         # 공식 문서 → 모드 1·2 일반 절차
+    ;;
+  *)
+    KIND="article"          # 개인/회사 블로그 등 → 모드 1·2 일반 절차
+    ;;
+esac
+```
+
+`KIND=community_repo`이면 섹션 G의 GitHub repo 등재 절차를 적용한다.
+
 ### 1. 모드 선택
 
 ```
@@ -44,13 +65,17 @@ python3 - <<'PY'
 url = "{유저_제공_URL}"
 trusted = ["anthropic.com","docs.anthropic.com","platform.claude.com","code.claude.com",
            "mitchellh.com","simonwillison.net","lilianweng.github.io",
-           "openai.com/blog","deepmind.google","karpathy.ai","morphllm.com"]
+           "openai.com/blog","deepmind.google","karpathy.ai","morphllm.com",
+           "github.com"]
+is_github = "github.com/" in url
 print("Trusted:", any(d in url for d in trusted))
+print("is_github:", is_github)
 PY
 ```
 
 신뢰 도메인 아니면 유저에게 사유 질의 후 승인.
 승인되면 WebFetch → references에 새 섹션 추가 → rules에 핵심 규칙 반영(출처 번호 부여).
+**`is_github=True`이면 일반 article 절차 대신 섹션 G(GitHub repo 등재 절차)를 따른다.**
 
 ### 4. 모드 3: AI 자동 검색
 

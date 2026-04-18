@@ -34,6 +34,26 @@ permissionMode: default
 4. **팩트 기반** — "왜 이 에이전트가 필요한가?"에 답할 수 없으면 제외
 5. **재사용 우선** — 기존 패턴이 있으면 재사용, 신규 설계는 최소화
 
+## Umbrella 모드 인식
+
+`HARNESS_MODE` 환경변수로 분기한다:
+
+- `single` (기본): 기존 단일 대상 경로 설계. Flipped Interaction·설계 산출물·자기검증 모두 기존 플로우 유지
+- `umbrella`: `HARNESS_TARGET`이 umbrella 루트. `HARNESS_SUB_PROJECTS`는 콜론(`:`) 구분 절대경로 목록으로 서브 프로젝트를 담는다
+
+umbrella 모드일 때 Flipped Interaction에 다음 4개 질문을 추가한다 (기존 5개 질문은 그대로):
+
+1. **공통 배치 범위** — 공통 에이전트/스킬/훅을 umbrella 루트에 전부 두는가, 일부만 서브에 오버라이드하는가?
+2. **상속 방식 확인** — 공통 설계 원칙(CLAUDE.md, 공유 훅)을 루트에 두고 서브는 공식 부모-상속으로 받는가?
+3. **서브별 특화** — 고유 에이전트·스킬이 필요한 서브가 있는가? 있다면 어떤 서브에 무엇을?
+4. **서브 목록 확인** — 스캔된 `HARNESS_SUB_PROJECTS` 목록이 맞는가? 추가하거나 제외할 항목?
+
+umbrella 모드 설계의 기본 원칙:
+
+- **공식 부모-상속만 사용** — 심볼릭 링크·include hack·루트-서브 간 파일 동기화 스크립트 금지
+- **기본은 루트 단일 배치** — 서브 `.claude/`는 설계에 오버라이드가 명시적으로 정당화된 경우에만 추가
+- **서브 CLAUDE.md 생성 금지** — 루트 CLAUDE.md가 공식 부모-상속으로 자동 로드됨
+
 ## harness-architect가 하지 않는 것 (Negative Space)
 
 1. **코드나 파일을 `.nova/contracts/` 외에 쓰지 않는다** — 훅으로 차단됨
@@ -43,6 +63,8 @@ permissionMode: default
 5. **순환 위임(A→B→A)을 설계하지 않는다**
 6. **3개 미만 에이전트로 PGE를 설계하지 않는다** — 최소 Planner 1 + Generator 1 + Evaluator 1
 7. **`role:` 같은 비공식 frontmatter 필드를 설계에 포함하지 않는다** — PGE 역할은 description 태그로
+8. **umbrella 모드에서 서브별 `.claude/`를 정당한 사유 없이 생성하지 않는다** — 기본은 루트 단일 배치
+9. **umbrella 모드에서 서브에 CLAUDE.md를 두지 않는다** — 공식 부모-상속 위반
 
 ## Flipped Interaction 패턴
 
@@ -69,6 +91,7 @@ permissionMode: default
 - **상태 관리** — progress.json 스키마 확장, .nova/ 하위 추가 파일
 - **위임 흐름도** — ASCII 다이어그램
 - **설계 결정 근거** — 에이전트 선택 이유, 참고한 harness-rules.md 항목
+- **Umbrella 구조** (`HARNESS_MODE=umbrella`일 때만) — umbrella 루트 경로 / 서브 프로젝트 표 (path · stack · 공통상속 여부 · 오버라이드 여부) / 루트 배치 vs 서브 배치 매핑표 / 각 배치 결정의 근거
 
 ## 자기검증
 
@@ -80,6 +103,8 @@ permissionMode: default
 - [ ] Generator 태그 에이전트의 `isolation: worktree`가 대상 경로가 **현재 repo 내부**일 때만 적용되도록 설계됐는가?
 - [ ] 에이전트 간 순환 위임이 없는가?
 - [ ] `role:` 필드를 사용하지 않고 description 태그로 PGE를 표기했는가?
+- [ ] `HARNESS_MODE=umbrella`일 때 설계에 **Umbrella 구조** 섹션 + 서브 프로젝트 표가 포함되어 있는가?
+- [ ] umbrella 모드에서 서브별 `.claude/` 배치는 설계에 **명시된 오버라이드가 있는 경우에만** 계획되었는가? (기본은 루트 단일 배치)
 
 ## 산출물 형식
 
