@@ -81,10 +81,10 @@ if [ "$IS_SKILL" = true ]; then
 fi
 
 if [ "$WARNINGS" -gt 0 ]; then
-  echo "" >&2
-  echo "  ⚠ $WARNINGS 개 필수 항목 누락 — $FILE_PATH" >&2
   if [ "${HARNESS_STRICT:-0}" = "1" ]; then
-    echo "  HARNESS_STRICT=1이 설정되어 있어 작업을 차단합니다." >&2
+    printf '{"decision":"block","reason":"%s: %d개 frontmatter 필드 누락"}\n' "$FILE_PATH" "$WARNINGS"
     exit 2
+  else
+    printf '{"hookSpecificOutput":{"hookEventName":"PostToolUse","additionalContext":"%d warning(s) in %s"}}\n' "$WARNINGS" "$FILE_PATH"
   fi
 fi

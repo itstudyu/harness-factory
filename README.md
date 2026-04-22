@@ -1,5 +1,7 @@
 # harness-factory
 
+> 현재 설계 원칙 버전: **v2.3.1** (2026-04-18). `references/harness-rules.md` 참조.
+
 새 프로젝트를 위한 Claude Code 하네스 구조(에이전트, 스킬, 훅)를 자동 생성하는 메타-하네스.
 
 ## 개요

@@ -2,6 +2,7 @@
 name: rules-updater
 description: harness-rules.md와 harness-references.md를 최신 공식 문서 및 trusted article 기반으로 갱신한다. 유저가 새 URL을 제공하거나 AI가 WebSearch로 최신 article을 검색해 반영한다.
 disable-model-invocation: true
+allowed-tools: Read, Write, Edit, Bash, WebFetch, WebSearch
 ---
 
 # Rules Updater
