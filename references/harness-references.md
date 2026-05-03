@@ -1,8 +1,29 @@
 # Harness Design References
 
-이 문서는 `harness-rules.md`의 원본 소스 상세 분석을 담는다.
-각 섹션 번호는 `harness-rules.md`의 출처 각주 번호 `[n]`과 일치한다.
-갱신 시 `/rules-updater` 스킬을 사용한다.
+이 문서는 v2 [`principles.md`](principles.md)와 [`knowledge-pack/`](knowledge-pack/INDEX.md)이 인용하는 원본 소스의 상세 분석을 담는다.
+각 섹션 번호는 v1 시절 출처 각주 번호 `[n]`을 그대로 유지한다 (knowledge-pack의 tier 분류와 매칭).
+갱신은 `/harness-upgrade` 스킬로 수행한다 (분기 1회 또는 새 표준 발표 시).
+
+## ⭐ Knowledge Pack — 외부 레퍼런스 (NEW 2026-05-03)
+
+v2 [`principles.md`](principles.md)가 참조하는 핵심 출처를 보강하는 **20개 GitHub repo + 12개 공식 문서** 분석.
+
+→ **[knowledge-pack/INDEX.md](knowledge-pack/INDEX.md)** 에서 시작.
+
+```
+knowledge-pack/
+├── INDEX.md          # 카탈로그 (Tier 1~4 + 공식 문서)
+├── LOG.md            # append-only 변경 이력
+├── tier-1-essential/   (4개, ★ 합계 222.8k)
+├── tier-2-strong/      (4개, ★ 합계 84.6k)
+├── tier-3-supporting/  (5개, ★ 합계 191.4k)
+├── tier-4-inspiration/ (7개, ★ 합계 287.6k)
+└── official-docs/      (12개, Anthropic + Claude Code Docs)
+```
+
+**`/harness-upgrade`가 진단·patch·검수 시 1차 참조 자료**.
+
+분기 1회 갱신. 변경은 `LOG.md`에 append-only 기록.
 
 ---
 
@@ -481,7 +502,7 @@ Explore → Plan → Code → Commit (4단계)
 
 ### 검증 정책
 - rules로 인용 시 **commit SHA + 직접 인용한 줄 번호** 기록
-- archived / 90일 무활동 → 다음 `/rules-updater` 실행 시 제거
+- archived / 90일 무활동 → 다음 `/harness-upgrade` 실행 시 제거
 
 ---
 

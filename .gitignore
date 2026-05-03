@@ -1,13 +1,9 @@
 .DS_Store
 __MACOSX/
-.nova/sessions.jsonl
-.nova/contracts/
-.nova/progress.json
 .claude/settings.local.json
-# upgrade 런타임 산출물
-upgrade-report.md
-upgrade-applied.md
-orchestrator-state.json
 *.swp
 *.swo
 *~
+
+# harness-factory operational data
+.hfx/

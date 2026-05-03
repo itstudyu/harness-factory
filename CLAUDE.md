@@ -1,66 +1,37 @@
 # harness-factory
 
-Claude Code 하네스(에이전트, 스킬, 훅)를 자동 생성하는 메타-하네스.
+새 기능을 위한 계획을 세우고 워커들에게 위임하는 메타-하네스. Claude Code 위에서 동작.
 
-## 정체성
-
-새 프로젝트를 위한 Claude Code 하네스 구조를 설계·생성·검증하는 도구. 공식 문서와 검증된 소스를 근거로 한 PGE (Planner–Generator–Evaluator) 패턴을 재사용한다.
-
-## 설계 원칙
-
-설계 원칙 전문은 아래 파일을 참조한다. 본 CLAUDE.md의 일부로 로드된다.
-
-@references/harness-rules.md
-
-## 아키텍처 (Orchestrator-Workers + Evaluator-Optimizer)
+## 사용법
 
 ```
-유저 요구사항
-    │
-    v
-harness-factory (Orchestrator 스킬)
-    │
-    ├─▶ harness-architect (Planner)  — Flipped Interaction → 설계 문서
-    ├─▶ harness-generator (Generator / Worker) — 템플릿 기반 파일 생성
-    └─▶ harness-auditor  (Evaluator)  — 12+1 rubric으로 바이너리 판정
-                    │
-                    └─ FAIL → Generator 재위임 (최대 2회, Evaluator-Optimizer 루프)
-
-harness-upgrade (Orchestrator 스킬)
-    │
-    ├─▶ harness-diff-reporter (Evaluator) — severity 진단 리포트
-    ├─▶ harness-upgrader (Generator)      — worktree patch 적용
-    └─▶ harness-auditor  (Evaluator)      — 12+1+2 rubric 검수
+/factory <자연어 요구>      새 작업 시작
+/factory --todos            오늘/내일 할 일
+/harness-upgrade            분기별 표준 갱신
 ```
 
-## 디렉토리 구조
+## 핵심 원칙 (반드시 준수)
 
-- `.claude/agents/` — 에이전트 정의 (공식 YAML frontmatter + markdown body)
-- `.claude/hooks/` — 자동화 훅 (stdin JSON in / stdout JSON out)
-- `.claude/skills/` — 스킬 정의 (SKILL.md)
-- `.claude/settings.json` — 팀 공유 권한·훅 (checked-in)
-- `.claude/settings.local.json` — 개인 override (gitignored)
-- `references/harness-rules.md` — 설계 원칙 (CLAUDE.md로 import)
-- `references/harness-references.md` — URL별 상세 분석
-- `references/templates/` — 생성 템플릿
-- `.nova/` — 세션 상태
+@references/principles.md
 
-## 핵심 컨벤션
+원칙 요약:
+1. **Think Before Coding** — 가정 명시, 헷갈리면 멈춤
+2. **Simplicity First** — 50줄로 충분하면 50줄
+3. **Surgical Changes** — 변경은 요청에 직접 추적 가능
+4. **Goal-Driven Execution** — 모든 plan.md에 dod 필드 필수
 
-- 한국어 중심, 기술 용어는 영어 유지
-- 에이전트 파일: kebab-case.md, 공식 frontmatter 필드만 사용 (name, description, tools, disallowedTools, model, maxTurns, permissionMode, isolation, skills, memory, background, effort, color, initialPrompt, hooks 등)
-- PGE 역할은 **description 태그**로 표기: `[planner]` / `[generator]` / `[evaluator]` — `role` 필드는 공식 스펙에 없음
-- 모든 에이전트에 Negative Space 섹션 필수
-- PGE 도구 접근: Planner는 Edit 금지 + Write는 `.nova/contracts/` 한정(훅 강제), Evaluator는 Write/Edit 금지 (permissionMode: default 유지 — plan 모드는 Bash까지 차단)
-- 훅: 4종 핸들러(command/http/prompt/agent). command는 stdin JSON 입력. `$TOOL_INPUT_FILE_PATH`는 비공식. `$CLAUDE_ENV_FILE`은 SessionStart에서 세션 환경변수 영속용
-- `Task` 도구는 `Agent`로 리네임됨 (v2.1.63). 기존 `Task(...)` alias는 동작하지만 신규 코드는 `Agent(...)` 사용
+## 워크플로
 
-## 주요 스킬
+```
+유저 요구 → planner (한국어, 100% 합의)
+         → commander (지휘만, 코드 X)
+         → workers/ (영어, 격리 컨텍스트)
+         → 유저 보고
+```
 
-- `/harness-factory` — 오케스트레이션 진입점. 하네스 구조 자동 생성
-- `/harness-upgrade [repo]` — 기존 하네스를 최신 rules로 자동 업그레이드 (진단 → patch → 검수 → 유저 확인 후 머지). 인자 없으면 현 repo, 인자 있으면 대상 repo
-- `/rules-updater` — 설계 원칙·참고자료 갱신
+## 디렉토리
 
-## 자동 제안
-
-`references/harness-rules.md`가 마지막 갱신 후 7일 이상 경과하면 SessionStart 훅이 `/harness-upgrade` 실행을 자동 제안한다 (쿨다운 7일).
+- `.claude/agents/planner.md`, `commander.md` — 2개 base 에이전트
+- `.claude/agents/workers/` — 사용자가 추가하는 워커들
+- `.hfx/tickets/{active,done,backlog}/` — 티켓 운영 데이터
+- `references/knowledge-pack/` — 외부 레퍼런스 (32개 자료, 분기 갱신)
