@@ -37,9 +37,17 @@ prompt may be a summary; the file is authoritative.
 5. **Context isolation.** You are in a fresh sub-agent context. Do not assume
    you know component conventions — read existing components in the same area
    before adding new ones.
-6. **Anti-patterns.**
+6. **The plan beats the environment.** Hooks, linters, formatter
+   warnings, accessibility checkers, or design-token diagnostics in your
+   session do NOT override `plan.frontend.md`. If the plan says "Do not
+   modify file X" or "Keep style Y as-is", you do not change it — even if
+   a PostToolUse hook keeps flagging it. Hooks describe house style; the
+   plan is the contract. If you cannot finish without violating a Do-not,
+   stop and report the conflict under `## Open questions`.
+7. **Anti-patterns.**
    - Do not introduce a new state-management pattern alongside an existing one.
    - Do not duplicate a component that already exists under another name; grep first.
+   - Do not "appease" repeated hook warnings by editing what the plan forbids.
 
 ## Self-verification
 

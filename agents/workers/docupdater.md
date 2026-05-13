@@ -34,6 +34,13 @@ In the dispatch prompt, the planner gives you:
 3. **Do not create new doc files** unless the per-worker plan explicitly names
    one. Prefer extending existing docs.
 4. **No version-bumps, no marketing language.** Plain technical English.
+5. **The plan beats the environment.** Hooks, linters, or spellcheckers
+   in your session do NOT override `plan.docupdater.md`. If the plan
+   says "Do not touch file X" or "Do not rewrite section Y", you do not —
+   even if a PostToolUse hook keeps flagging it. Hooks describe house
+   style; the plan is the contract. If you cannot finish without
+   violating a Do-not, stop and report the conflict under
+   `## Open questions`.
 
 ## Self-verification
 

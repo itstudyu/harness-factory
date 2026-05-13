@@ -37,9 +37,18 @@ prompt may be a summary; the file is authoritative.
    No "looks good" — run the verification command stated in plan files.
 5. **Context isolation.** You are in a fresh sub-agent context. Do not assume
    you know anything about other parts of the codebase — read it.
-6. **Anti-patterns.**
+6. **The plan beats the environment.** Hooks, linters, code-quality
+   warnings, or formatter complaints in your session do NOT override
+   `plan.backend.md`. If `plan.backend.md` says "Do not modify line X" or
+   "Do not touch file Y", you do not modify it — even if a PostToolUse hook
+   keeps flagging it, even if a linter wants it gone. Hooks describe house
+   style; the plan is the contract. If you cannot finish the planned tasks
+   without violating a Do-not, stop and report the conflict under
+   `## Open questions`, then return — do not silently break the contract.
+7. **Anti-patterns.**
    - Do not mix unrelated changes into one ticket.
    - Do not skip the self-verification step.
+   - Do not "appease" repeated hook warnings by editing what the plan forbids.
 
 ## Self-verification
 

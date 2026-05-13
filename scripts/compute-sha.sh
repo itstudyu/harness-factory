@@ -3,11 +3,16 @@
 #
 # The content_sha is the sha256 of the concatenated plan.md and plan.*.md
 # files in the ticket directory, with the `content_sha:`, `approved_at:`,
-# and `status:` lines stripped from plan.md so the hash only covers
-# planning content, not the gate metadata or the workflow status flag.
-# (status flips draft→ready→in-progress→done during the lifecycle and
-# is not part of the agreed plan; including it would invalidate the sha
-# on every state transition.)
+# `status:`, and `created:` lines stripped from plan.md so the hash only
+# covers planning content, not gate metadata, workflow status, or
+# timestamps that may drift across edits.
+#
+# Why each is excluded:
+# - content_sha: would self-reference its own hash.
+# - approved_at: filled at the gate, after the hash is computed.
+# - status:     flips draft→ready→in-progress→done across the lifecycle.
+# - created:    can get re-emitted with a new ISO timestamp if the
+#               planner regenerates frontmatter during an [e]dit cycle.
 #
 # Usage: compute-sha.sh <ticket-dir>
 # Prints: 64-char hex digest on stdout. Exit 0 on success.
@@ -45,7 +50,7 @@ fi
 # Strip the gate metadata lines from plan.md so they don't self-reference.
 # Then concat with all plan.*.md (worker plans) in sorted order.
 {
-  sed -E '/^(content_sha|approved_at|status):.*$/d' "$plan"
+  sed -E '/^(content_sha|approved_at|status|created):.*$/d' "$plan"
   # shellcheck disable=SC2012
   ls "$ticket_dir"/plan.*.md 2>/dev/null | sort | while IFS= read -r f; do
     [ -f "$f" ] && cat "$f"
