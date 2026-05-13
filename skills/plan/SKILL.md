@@ -132,14 +132,10 @@ date in the user's local zone if known; otherwise UTC. Slug ≤ 40 chars.
 Set `TICKET_DIR = ${CLAUDE_PROJECT_DIR}/.harness/tickets/active/<ticket-id>`,
 substituting the actual generated ticket-id.
 
-Use the `Bash` tool to create the directory, substituting the actual
-ticket-id you generated above:
+Use the `Bash` tool at this point — substitute the actual generated
+ticket-id into the path, then run:
 
     mkdir -p "${CLAUDE_PROJECT_DIR}/.harness/tickets/active/<actual-ticket-id-here>"
-
-(Do NOT use a ` ```! ` shell-injection block for this step — the
-ticket-id is dynamic and a literal `<ticket-id>` placeholder would be
-sent to the shell unchanged.)
 
 `Read` the two templates:
 - `${CLAUDE_PLUGIN_ROOT}/templates/plan.md.tmpl`
@@ -165,9 +161,8 @@ Show the user the rendered file paths and the **full text** of `plan.md`
 | Plan   | Plan 파일들 그대로 승인할까요?              | [a] approve — fill approved_at + content_sha (Recommended) / [e] edit plan files / [q] I have a question |
 
 - `[a]` →
-   1. Use the `Bash` tool (do NOT use a ` ```! ` injection block —
-      the ticket-id is dynamic) to compute the sha, substituting the
-      actual ticket-id you generated in Step 6:
+   1. Use the `Bash` tool at this point — substitute the actual
+      ticket-id from Step 6 into the path, then run:
 
           bash "${CLAUDE_PLUGIN_ROOT}/scripts/compute-sha.sh" \
                "${CLAUDE_PROJECT_DIR}/.harness/tickets/active/<actual-ticket-id-here>"
