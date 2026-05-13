@@ -48,24 +48,29 @@
 
 ## Install
 
-```
-/plugin marketplace add itstudyu/hfx
-/plugin install hfx@itstudyu
+The plugin is loaded by Claude Code's `--plugin-dir` CLI flag. Clone
+the repo, then start Claude Code from your project directory:
+
+```bash
+git clone https://github.com/itstudyu/hfx /path/to/hfx
+cd /path/to/your-project
+claude --plugin-dir /path/to/hfx
 ```
 
-Or for local development:
-
-```
-/plugin install --plugin-dir /path/to/hfx
-```
-
-Verify:
+Verify inside Claude Code:
 
 ```
 /plugin
 ```
 
-You should see `hfx 0.0.1` listed.
+You should see `hfx` listed with its version. `/help` will show the
+five `/hfx:*` slash commands.
+
+> Note: the inline-load may surface a benign warning
+> (`Plugin "hfx" not found in marketplace "hfx"`). Ignore it — the
+> plugin is loaded; the warning only means we are not registered as
+> a marketplace package. Marketplace distribution is not part of
+> v0.0.x.
 
 ---
 
@@ -122,8 +127,7 @@ hfx/                                  ← plugin (installed by /plugin install)
 ├── templates/{planner-policy.md, refs.yaml, memory-INDEX.md,
 │              plan.md.tmpl, plan.worker.md.tmpl}
 ├── scripts/{compute-sha.sh, verify-approval.sh, move-ticket.sh}
-├── tests/{scenario.md, results.template.md, repo-bootstrap.sh}
-├── docs/reviews/                      ← self-review records, if any
+├── docs/reviews/                      ← seven rounds of self-review records
 └── README.md, LICENSE
 ```
 
@@ -267,21 +271,32 @@ From `/Users/yu_s/.claude/reference/hfx/principle.md`:
 
 ## Testing the plugin
 
-See `tests/scenario.md` for a self-contained end-to-end test you can run
-in a separate Claude Code session. It exercises every command and the
-hard gate's tamper detection.
+The plugin was developed end-to-end against a fixture project (a
+trivial Node HTTP server) using a scripted scenario. The development
+scenario, its results, and the seven rounds of critical self-review
+(`docs/reviews/round-1..7.md`) document what was exercised and which
+bugs each round caught.
+
+To smoke-test the plugin yourself in a throwaway directory:
 
 ```bash
-bash tests/repo-bootstrap.sh         # creates /tmp/hfx-test-<date>/
-cd /tmp/hfx-test-<date>
-claude                                # follow tests/scenario.md from there
+mkdir /tmp/hfx-smoke && cd /tmp/hfx-smoke
+git init -q && echo '{}' > package.json && git add . \
+  && git -c user.email=t@x -c user.name=t commit -q -m init
+claude --plugin-dir /path/to/hfx
+# inside Claude Code:
+#   /hfx:init
+#   /hfx:plan "Add a /health endpoint returning {status:ok} as JSON"
+#   /hfx:run
+#   /hfx:status
 ```
 
 ---
 
 ## Versioning
 
-`v0.0.1` is the initial planner-led harness. No backwards compatibility
+The current release is the initial planner-led harness, hardened by
+seven rounds of self-review. No backwards compatibility
 to any earlier `hfx` (the repo was reset). Worker file format may evolve
 in `v0.x` minor versions; the plan file `frontmatter` schema is intended
 to be stable.
