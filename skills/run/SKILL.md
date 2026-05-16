@@ -160,8 +160,122 @@ format specified.
    start new levels).
 
    For each succeeded step, record the worker's reported `Files changed`
-   and verification output, then proceed to Step 4a (review loop) for
-   **each succeeded step in this level** before moving to the next level.
+   and verification output, then proceed to Step 4.5 (worktree hand-off)
+   **before** Step 4a, for **each succeeded step in this level**, before
+   moving to the next level.
+
+## Step 4.5 — worktree hand-off (per succeeded step, no user questions)
+
+**Why this step exists.** Workers whose agent file declares
+`isolation: worktree` run inside `.claude/worktrees/agent-<id>/`. Their
+`Edit`/`Write` operations land in the worktree, not in the main project
+tree. Without this step the worker reports `DONE` but `git status` in
+the main project shows nothing — confusing the user and breaking
+downstream reviewers that diff against the main project HEAD.
+
+This step copies the worker's allow-listed output from the worktree
+back to the main project root using `scripts/handoff-worktree.sh`. The
+allow-list is the worker plan's `Files manifest` (Create + Modify
+entries) — anything the worker touched outside that list is reported
+as `out_of_scope`, never copied.
+
+### 4.5.1 — Skip if not a worktree worker
+
+Read the worker's resolved agent file (from Step 2b's discovery map)
+and grep its frontmatter for `isolation: worktree`. If absent, skip
+this entire step — the worker wrote directly to the main tree.
+
+### 4.5.2 — Detect the worktree path
+
+The `Agent` tool returns the worktree path and branch in its result
+when changes were made (see the system-prompt note: *"With
+`isolation: \"worktree\"`, the worktree is automatically cleaned up
+if the agent makes no changes; otherwise the path and branch are
+returned in the result."*). Parse the worktree path from the agent
+result. If the agent result does not contain a worktree path, fall
+back to scanning `.claude/worktrees/` for the most recently modified
+`agent-*` directory whose branch matches the agent's reported branch.
+
+If neither yields a worktree path, log it in `step.notes` and skip
+the rest of 4.5 — the worker either ran without isolation despite
+the frontmatter, or made no changes (a no-op success).
+
+### 4.5.3 — Extract the allow-list from plan.\<worker\>.md
+
+Parse `<TICKET_DIR>/<step.plan_file>` `## Files manifest` section.
+Collect every path under `**Create:**` and `**Modify:**` bullets. Skip
+`**Test:**` only if the worker is not a test author. (If the manifest
+literally says "(none — empty project)", the allow-list is empty and
+this step degrades to a no-op that just reports `out_of_scope` for
+everything the worker actually touched — fail-fast surfaces the
+scope mismatch.)
+
+Write the paths, one per line, to a temp file. Use the `Bash` tool:
+
+```!
+TMP_MANIFEST="$(mktemp)"
+# (planner: emit the actual paths from the parsed manifest, one per line)
+printf '%s\n' \
+  "index.html" \
+  "style.css" \
+  > "$TMP_MANIFEST"
+echo "$TMP_MANIFEST"
+```
+
+### 4.5.4 — Run the hand-off script
+
+Use the `Bash` tool — substitute the actual worktree path, project
+root, and manifest temp file:
+
+```!
+bash "${CLAUDE_PLUGIN_ROOT}/scripts/handoff-worktree.sh" \
+     "<worktree-dir>" \
+     "${CLAUDE_PROJECT_DIR}" \
+     "<TMP_MANIFEST>"
+```
+
+The script prints a single JSON line to stdout:
+
+```
+{"copied":[...],"skipped_same":[...],"conflicts":[...],"out_of_scope":[...]}
+```
+
+Capture it as `step.handoff`.
+
+### 4.5.5 — Branch on the result
+
+| Field          | Meaning                                                         | Action |
+|----------------|-----------------------------------------------------------------|--------|
+| `copied`       | Files newly landed in the main tree                             | record as the canonical landed paths |
+| `skipped_same` | Files already identical in the main tree (idempotent re-run)    | record as landed too |
+| `conflicts`    | Files exist in main tree with different content — **NOT** overwritten | **fail the step** |
+| `out_of_scope` | Files the worker touched that are not in the manifest           | **fail the step** (scope creep) |
+
+If `conflicts` is non-empty: mark `step.outcome = failed`, record the
+conflict list in `step.handoff_findings`, and treat as a fail-fast event
+(no Step 4a, results.md gets `overall: failed`). The user must reconcile
+the conflict manually — copying the worker's version over a divergent
+main-tree file would silently destroy user changes.
+
+If `out_of_scope` is non-empty: mark `step.outcome = failed` with
+`step.handoff_findings` listing each path. The worker exceeded its plan;
+this is the same class of violation as a reviewer's `OUT_OF_SCOPE`
+finding (spec-reviewer Hard rule #5) and gets the same treatment.
+
+Otherwise (only `copied` and `skipped_same`): the landed paths replace
+the worker's worktree-relative paths everywhere downstream. Update
+`step.files_changed` to the union of `copied` + `skipped_same`. These
+are the paths reviewers and results.md will see.
+
+### 4.5.6 — Clean up the temp manifest
+
+```!
+rm -f "<TMP_MANIFEST>"
+```
+
+(The worktree itself is not deleted — Claude Code manages worktree
+lifecycle, and leaving it lets the user diff against the worktree if a
+later step needs forensics.)
 
 ## Step 4a — review loop (per succeeded step, no user questions)
 
@@ -170,31 +284,30 @@ Read `plan.md` frontmatter to get `review_mode` and `security_review`
 
 For each step that just completed with `step.outcome = succeeded`:
 
-### 4a.1 — Determine commit range for the diff
+### 4a.1 — Determine the file set for review
 
-Use the `step.base_sha` captured in Step 4.1a (before this step's
-dispatch). For HEAD_SHA, prefer the worker's reported commit; if the
-worker did not commit, fall back to comparing the worktree against
-base:
+After Step 4.5 hand-off, the canonical set of changed files is
+`step.files_changed` (copied + skipped_same from the hand-off result).
+These paths are guaranteed to exist in the main project tree.
 
 - `BASE_SHA = step.base_sha`  (from Step 4.1a)
-- `HEAD_SHA = git rev-parse HEAD`  (in the main project, since the
-  worktree may have been cleaned up after the agent returned)
+- `HEAD_SHA = git rev-parse HEAD`  (in the main project)
+- `FILES   = step.files_changed`  (main-tree-relative paths landed by 4.5)
 
-If `BASE_SHA == HEAD_SHA` (worker reported success but committed
-nothing), check the worktree dir directly:
+The reviewer compares `FILES` against `BASE_SHA`. If the worker
+committed inside the worktree (rare), `HEAD_SHA` will have advanced;
+otherwise `FILES` are still untracked/modified in the main tree and the
+reviewer reads them directly (the worker plan's expected content is
+the authoritative spec, not commit state).
 
-```!
-git status --porcelain "<worktree-dir>" 2>/dev/null | head -5
-```
+If `step.files_changed` is empty (worker reported success but Step 4.5
+copied nothing — typically a docs-only or refactor-in-place worker
+whose `Files manifest` was `(none)`): skip reviewers and record the
+oddity in `step.notes`.
 
-If the worker left uncommitted changes, the reviewer should diff the
-worktree against `BASE_SHA` using `git diff $BASE_SHA -- <files>`
-from inside the worktree.
-
-If both commits and uncommitted changes are absent, skip reviewers —
-the worker reported success but changed nothing. Record this oddity
-in `step.notes` and move on (still treat as succeeded, but log).
+For workers without `isolation: worktree` (i.e., Step 4.5 was skipped),
+fall back to the v0.0.5 behavior: `FILES = worker-reported Files changed`
+from the agent return, paths resolved against the main project root.
 
 ### 4a.2 — Dispatch spec-reviewer (if review_mode ∈ {lenient, strict})
 
@@ -216,11 +329,14 @@ You are reviewing the just-completed work for step <step.id>.
 
 ---
 
-Implementer's reported Files changed:
-<list>
+Files landed in the main project tree (canonical — these are the paths
+to review; the worker may have originally written them inside an
+isolated worktree, but Step 4.5 hand-off has copied them to the main
+project root and verified they match the worker plan's Files manifest):
+<step.files_changed>
 
 Ticket directory: <TICKET_DIR>
-Worktree directory: <worktree-dir if known, else "(cleaned up — diff against project HEAD)">
+Project root:     <CLAUDE_PROJECT_DIR>
 BASE_SHA: <step.base_sha>
 HEAD_SHA: <see 4a.1>
 
@@ -292,11 +408,12 @@ scope: <diff | full>   ← from plan.md frontmatter
 
 ---
 
-Implementer's reported Files changed:
-<list>
+Files landed in the main project tree (canonical paths after Step 4.5
+hand-off; review these against BASE_SHA):
+<step.files_changed>
 
 Ticket directory: <TICKET_DIR>
-Worktree directory: <worktree>
+Project root:     <CLAUDE_PROJECT_DIR>
 BASE_SHA: <pre-dispatch SHA>
 HEAD_SHA: <post-dispatch SHA>
 
@@ -339,7 +456,13 @@ overall: succeeded | failed
 
 ### <step.id> — <worker>  [succeeded | failed]
 **Files changed:**
-- <path>
+- <path>   (landed at this path in the main project root)
+
+**Hand-off:** <one of>
+- `n/a` — worker did not use `isolation: worktree`
+- `clean` — all files copied or already identical (worktree → main)
+- `conflicts: <list>` — main tree had divergent content; step failed
+- `out_of_scope: <list>` — worker touched files outside its manifest; step failed
 
 **Verification:**
 <verbatim verification block from worker>
@@ -424,6 +547,14 @@ End with a one-line summary of what was saved.
 - Step 2 fail → exit, do not dispatch.
 - Step 4 worker failure → fail-fast, results.md still written with
   `overall: failed`, no Step 6, no Step 7. Ticket remains in `active/`
+- Step 4.5 hand-off failure (conflicts or out_of_scope) → mark
+  `step.outcome = failed`, write `results.md` with `overall: failed` and
+  the `Hand-off:` block populated with the conflict / out_of_scope list,
+  skip Step 4a (no review of unlanded files), skip Step 6/7. Ticket stays
+  in `active/`. The user resolves by either reconciling the conflict
+  manually (then re-running `/hfx:run`, which is idempotent on Step 4.5)
+  or by editing the plan to expand the manifest and re-approving via
+  `/hfx:plan`.
   for inspection.
 - Step 5–7 file write failures → print which write failed; user can
   recover by re-running `/hfx:run` (Step 2 will pass since plan didn't
