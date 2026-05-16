@@ -195,14 +195,16 @@ Show the user the rendered file paths and the **full text** of `plan.md`
       - `approved_at: <current ISO timestamp>`
       - `content_sha: <sha from step 1>`
    3. Print:
-      > Approved. Next: `/hfx:run <actual-ticket-id>`.
+      > Approved (ticket `<actual-ticket-id>`, sha `<first-8-chars>`).
+   4. Proceed directly to Step 8 (handoff). Do **not** print a
+      "Next: `/hfx:run`" line here — Step 8 asks the user instead.
 - `[e]` → ask which file/section. Use `Edit` to update. Then loop back
   to Step 7 (sha will be recomputed on the next [a]).
 - `[q]` → answer, then re-present Step 7.
 
 ## Step 8 — handoff
 
-Final message must include:
+First print the ticket summary:
 
 ```
 ## Ticket created
@@ -211,10 +213,35 @@ Final message must include:
 - files:
   - .harness/tickets/active/<ticket-id>/plan.md
   - .harness/tickets/active/<ticket-id>/plan.<worker>.md  (× N)
-
-## Next
-Run `/hfx:run <ticket-id>` to dispatch workers.
 ```
+
+Then ask the user whether to dispatch now via **one** `AskUserQuestion`
+call:
+
+| header | question                                           | options |
+|--------|----------------------------------------------------|---------|
+| Run    | 지금 `/hfx:run <ticket-id>` 를 실행할까요?         | [y] yes — `/hfx:run` 안내만 출력 (Recommended) / [n] no — 나중에 직접 실행 |
+
+- `[y]` → print exactly:
+  > 실행하려면 다음을 직접 입력하세요: `/hfx:run <actual-ticket-id>`
+  >
+  > (Skill은 다른 skill을 자동 호출할 수 없습니다 — `/hfx:run` 은
+  > user-invoked 전용입니다.)
+  Then STOP.
+- `[n]` → print:
+  > 준비 완료. 나중에 `/hfx:run <actual-ticket-id>` 로 실행하세요.
+  Then STOP.
+
+**Why a question instead of a one-line "Next:" hint:** the prior
+behavior was to print `Next: /hfx:run <id>` and stop, which left users
+unsure whether `/hfx:plan` was actually finished or expecting more
+input. Asking explicitly closes the loop and lets the user choose to
+defer (e.g., to inspect plan files first) without scrolling back.
+
+**Why we cannot auto-dispatch:** `/hfx:run` has
+`disable-model-invocation: true` and runs only when the user types the
+slash command themselves. Even on `[y]`, this skill only emits the
+exact command for the user to paste.
 
 ## Hard rules
 
