@@ -48,29 +48,35 @@
 
 ## Install
 
-The plugin is loaded by Claude Code's `--plugin-dir` CLI flag. Clone
-the repo, then start Claude Code from your project directory:
+Inside Claude Code, add the marketplace and install the plugin. Use the
+full HTTPS URL — the short `owner/repo` form makes Claude Code try
+`git@github.com:...` over SSH, which fails unless you have SSH keys
+configured for GitHub.
 
-```bash
-git clone https://github.com/itstudyu/hfx /path/to/hfx
-cd /path/to/your-project
-claude --plugin-dir /path/to/hfx
+```
+/plugin marketplace add https://github.com/itstudyu/hfx
 ```
 
-Verify inside Claude Code:
+```
+/plugin install hfx@hfx-marketplace
+```
+
+### Verify
 
 ```
 /plugin
 ```
 
 You should see `hfx` listed with its version. `/help` will show the
-five `/hfx:*` slash commands.
+five `/hfx:*` slash commands (`init`, `plan`, `run`, `status`,
+`edit-worker`).
 
-> Note: the inline-load may surface a benign warning
-> (`Plugin "hfx" not found in marketplace "hfx"`). Ignore it — the
-> plugin is loaded; the warning only means we are not registered as
-> a marketplace package. Marketplace distribution is not part of
-> v0.0.x.
+### Update later
+
+```
+/plugin marketplace update hfx-marketplace
+/plugin update hfx@hfx-marketplace
+```
 
 ---
 
