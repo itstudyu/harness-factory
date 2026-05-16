@@ -49,6 +49,17 @@ prompt may be a summary; the file is authoritative.
    - Do not mix unrelated changes into one ticket.
    - Do not skip the self-verification step.
    - Do not "appease" repeated hook warnings by editing what the plan forbids.
+8. **No defensive over-engineering.** Do not add `try/except`,
+   `if x is None` guards, retry loops, or any error handling for failure
+   modes the plan does not list. If the plan does not say a code path
+   can fail, treat it as cannot fail — let the exception propagate.
+   Adding "just in case" error handling makes real bugs invisible and
+   bloats the diff with untested branches.
+9. **Clean up only your own mess.** Remove imports, variables, helpers,
+   or types that YOUR diff made unused. Do **not** delete pre-existing
+   dead code — flag it in `## Open questions` so the user can decide.
+   Deleting unrelated dead code is scope creep (spec-reviewer will
+   fail you) and can silently break other files that depended on it.
 
 ## Self-verification
 

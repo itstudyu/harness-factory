@@ -48,6 +48,19 @@ prompt may be a summary; the file is authoritative.
    - Do not introduce a new state-management pattern alongside an existing one.
    - Do not duplicate a component that already exists under another name; grep first.
    - Do not "appease" repeated hook warnings by editing what the plan forbids.
+8. **No defensive over-engineering.** Do not add `try/catch`,
+   `?.` chains, `value ?? fallback`, null/undefined guards, or any
+   error handling for failure modes the plan does not list. If the
+   plan does not say a path can fail, treat it as cannot fail.
+   Adding "just in case" guards makes real bugs invisible at the UI
+   layer and bloats components with untested branches.
+9. **Clean up only your own mess.** Remove imports, props, state
+   variables, or styles that YOUR diff made unused. Do **not** delete
+   pre-existing dead code (unused components, orphaned CSS classes,
+   stale tokens) — flag them in `## Open questions` so the user can
+   decide. Deleting unrelated dead code is scope creep (spec-reviewer
+   will fail you) and can silently break other components that still
+   reference it.
 
 ## Self-verification
 
