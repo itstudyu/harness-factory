@@ -6,6 +6,8 @@ requested-by: __USER__
 created: __ISO_TIMESTAMP__
 approved_at: null
 content_sha: null
+review_mode: off
+security_review: off
 dispatch_graph:
   steps:
     - id: __STEP_ID__
@@ -14,6 +16,23 @@ dispatch_graph:
       depends_on: []
       plan_file: plan.__WORKER_NAME__.md
 ---
+
+<!--
+review_mode    : off | lenient | strict   (default off — speed-first)
+   off     → no reviewer dispatched
+   lenient → spec-reviewer only
+   strict  → spec-reviewer → quality-reviewer
+
+security_review : off | diff | full       (default off)
+   off  → no security reviewer
+   diff → security-reviewer scoped to this ticket's diff
+   full → security-reviewer scans whole worktree
+
+Both fields are proposed by /hfx:plan Step 6.5 only if the plan touches
+a risky surface (auth/secrets/CI/prompts). For a normal ticket they
+stay at `off` so /hfx:run executes at full speed.
+-->
+
 
 ## Context
 

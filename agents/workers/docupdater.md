@@ -51,11 +51,18 @@ In the dispatch prompt, the planner gives you:
 ## Output format (final message)
 
 ```
+## Status
+<one of: DONE | DONE_WITH_CONCERNS | BLOCKED | NEEDS_CONTEXT>
+
 ## Summary
 <2–3 lines on what docs you updated>
 
 ## Tasks completed
 - [x] <Task 1>
+
+## Verification run
+n/a — docs-only step (no executable verification).
+If you ran a spellchecker or link checker, paste its output here.
 
 ## Files changed
 <list of paths>
@@ -64,3 +71,14 @@ In the dispatch prompt, the planner gives you:
 <Anything where the docs describe behavior different from what plan.md said
 the code would do. Empty if none.>
 ```
+
+### Status meanings (be honest, do not default to DONE)
+
+- **DONE** — all tasks met, docs match the diff, no divergences.
+- **DONE_WITH_CONCERNS** — docs updated but you noticed a plan ↔ code
+  divergence worth flagging. List under `## Divergences from plan`.
+- **BLOCKED** — could not find the code/symbol the docs are supposed
+  to describe. List the blocker.
+- **NEEDS_CONTEXT** — plan refers to behavior not yet in the diff.
+
+If you fail or get blocked, set `## Status: BLOCKED` and report.

@@ -63,6 +63,9 @@ you start one for a check, kill the process before reporting.
 ## Output format (final message)
 
 ```
+## Status
+<one of: DONE | DONE_WITH_CONCERNS | BLOCKED | NEEDS_CONTEXT>
+
 ## Summary
 <3–5 lines on what you did>
 
@@ -80,4 +83,16 @@ you start one for a check, kill the process before reporting.
 <Things noticed but out of scope. Do not act.>
 ```
 
-If you fail or get blocked, stop and report the blocker.
+### Status meanings (be honest, do not default to DONE)
+
+- **DONE** — all tasks met, type-check + lint PASS, no concerns.
+- **DONE_WITH_CONCERNS** — tasks met and checks PASS, but you noticed a
+  visual regression risk or a11y concern worth flagging. List under
+  `## Open questions`. Dispatcher treats as success.
+- **BLOCKED** — could not complete one or more tasks (missing
+  component, design token mismatch, broken build). List the blocker
+  and stop.
+- **NEEDS_CONTEXT** — plan references something you cannot find. Ask
+  the question, do not guess.
+
+If you fail or get blocked, set `## Status: BLOCKED` and report.

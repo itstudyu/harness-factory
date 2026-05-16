@@ -114,6 +114,7 @@ five `/hfx:*` slash commands (`init`, `plan`, `run`, `status`,
 | `/hfx:run [<id>]` | Verify gate and dispatch workers for an approved ticket | yes |
 | `/hfx:status`     | List active tickets and next actions                  | yes |
 | `/hfx:edit-worker "<r>"` | Edit an installed worker (model/tools/desc/body) | yes |
+| `/hfx:security`   | Standalone repo-wide security audit (CSO-style)       | yes |
 
 All commands have `disable-model-invocation: true` — Claude will not
 trigger them automatically. They run only when **you** type the slash
@@ -126,9 +127,10 @@ command.
 ```
 hfx/                                  ← plugin (installed by /plugin install)
 ├── .claude-plugin/plugin.json
-├── skills/{init,plan,run,status,edit-worker}/SKILL.md
+├── skills/{init,plan,run,status,edit-worker,security}/SKILL.md
 ├── agents/
-│   ├── workers/{backend,frontend,docupdater}.md
+│   ├── workers/{backend,frontend,docupdater,
+│   │            spec-reviewer,quality-reviewer,security-reviewer}.md
 │   └── helpers/code-analyst.md
 ├── templates/{planner-policy.md, refs.yaml, memory-INDEX.md,
 │              plan.md.tmpl, plan.worker.md.tmpl}
@@ -146,7 +148,10 @@ In your **project** (created by `/hfx:init`):
 │   ├── backend.md                    ← editable, per-project copies
 │   ├── frontend.md
 │   ├── docupdater.md
-│   └── code-analyst.md
+│   ├── code-analyst.md
+│   ├── spec-reviewer.md              ← always installed; fires only
+│   ├── quality-reviewer.md             when plan.md frontmatter says
+│   └── security-reviewer.md            review_mode/security_review != off
 .harness/
 ├── planner-policy.md                  ← edit freely; how the planner thinks
 ├── refs.yaml                          ← always-load / conditional / manual docs
@@ -237,6 +242,41 @@ graph once any worker fails, and the ticket stays in `active/` for
 inspection.
 
 ---
+
+## Reviewer workers (v0.0.5)
+
+Three fresh-context reviewer workers ship by default but stay idle on
+most tickets. They are installed unconditionally by `/hfx:init` but
+only dispatched when `plan.md` frontmatter sets them on:
+
+- `spec-reviewer` — adversarial spec compliance. Reads the per-worker
+  plan + actual diff; returns `SPEC_PASS` or `SPEC_FAIL` with itemized
+  gaps. Fires when `review_mode ∈ {lenient, strict}`.
+- `quality-reviewer` — code quality (Critical/Important/Minor with a
+  concrete "Important" bar). Fires when `review_mode == strict` AND
+  spec passed.
+- `security-reviewer` — CSO-style audit (8/10 confidence gate, exploit
+  scenario required, anti-prompt-injection, 22 hard-exclusions). Fires
+  when `security_review ∈ {diff, full}`.
+
+All three are read-only (`Read, Glob, Grep, Bash`, no `Edit/Write`).
+
+`/hfx:plan` Step 6.5 proposes `review_mode` and `security_review` based
+on risk signals (auth/secrets/CI/prompt files, multi-worker tickets,
+public API changes). Both default to `off` so normal tickets pay zero
+extra LLM cost — only risky surfaces trigger an opt-in question at
+plan time. `/hfx:run` reads the locked frontmatter and dispatches
+reviewers automatically (no questions).
+
+If a reviewer returns FAIL, the step is marked failed; the ticket
+stays in `active/` for human inspection. v0.0.5 deliberately does NOT
+re-dispatch the implementer with reviewer findings — code never moves
+without a human signature (see `skills/run/SKILL.md` Step 4a.4 for the
+rationale).
+
+`/hfx:security` is the standalone audit command — user-invoked, runs
+the same `security-reviewer` over the whole repo (or `--diff`), writes
+a JSON report to `.harness/security-reports/`. Use periodically.
 
 ## Helpers
 

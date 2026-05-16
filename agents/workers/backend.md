@@ -59,6 +59,9 @@ your final output and ask the planner to validate.
 ## Output format (final message)
 
 ```
+## Status
+<one of: DONE | DONE_WITH_CONCERNS | BLOCKED | NEEDS_CONTEXT>
+
 ## Summary
 <3–5 lines on what you did>
 
@@ -78,5 +81,20 @@ essential lines that prove PASS.>
 <Things you noticed that are out of scope but worth flagging. Do not act on them.>
 ```
 
-If you fail or get blocked, stop and report the blocker — do not improvise
-across the per-worker plan boundary.
+### Status meanings (be honest, do not default to DONE)
+
+- **DONE** — all tasks met, all verification commands PASS, no concerns.
+- **DONE_WITH_CONCERNS** — all tasks met and verification PASS, but you
+  noticed something worth flagging (perf risk, edge case, related bug
+  in adjacent code). List under `## Open questions`. The dispatcher
+  treats this as success but the reviewers will see the concern.
+- **BLOCKED** — you could not complete one or more tasks because the
+  plan conflicts with reality (missing file, version mismatch, env
+  issue). List the blocker under `## Open questions`. Do not improvise
+  a workaround — stop and report.
+- **NEEDS_CONTEXT** — the plan references something you cannot find or
+  understand without more information. Ask the question under
+  `## Open questions`. Do not guess.
+
+If you fail or get blocked, set `## Status: BLOCKED` and report — do
+not improvise across the per-worker plan boundary.

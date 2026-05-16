@@ -46,6 +46,26 @@ Then parse `refs.yaml`:
 
 If any referenced path is missing, note it but do not abort.
 
+### Active memory retrieval (planner-policy §5 read side)
+
+After loading INDEX.md, do a deterministic keyword match between
+`$ARGUMENTS` (lowercased) and each INDEX line:
+
+```
+keywords = lowercase($ARGUMENTS).split()
+matches  = []
+for line in INDEX.md:
+  hook = lowercase(line)
+  hits = count(k in hook for k in keywords)
+  if hits >= 1:
+    matches.append((hits, theme_file_from_line))
+top_3 = matches.sort_by(hits desc).take(3)
+```
+
+`Read` each of the top 1–3 theme files (parallel block). Use the
+contents during grilling so the planner doesn't re-ask things already
+learned. If 0 matches → skip; the index alone is enough.
+
 ## Step 2 — discover available workers (union: project-local + plugin-shipped)
 
 ```!
@@ -168,10 +188,56 @@ list from the sync (one entry per worker that has actual work).
 
 `Write`:
 - `<TICKET_DIR>/plan.md` (frontmatter: `status: draft`,
-  `approved_at: null`, `content_sha: null`)
+  `approved_at: null`, `content_sha: null`, `review_mode: off`,
+  `security_review: off`)
 - `<TICKET_DIR>/plan.<worker>.md` for every worker in the graph.
 
 Print a tree of what was written.
+
+## Step 6.5 — risk signal scan + review-mode proposal (opt-in question)
+
+Apply planner-policy §4a — see that section for the full signal table
+(path-match + keyword-match per signal). Compute the risk signals from
+the just-written plan files by greping the union of:
+(a) every path listed in `## Files manifest` / `## Reference files`, and
+(b) the natural-language text of `## Goal` and `## Tasks`.
+
+A signal fires if EITHER (a) or (b) matches. See planner-policy.md §4a
+for the exact patterns. Quick summary:
+
+- `worker_count` = entries in `dispatch_graph.steps`
+- `touches_auth`: paths `auth*|login*|session*|token*|jwt*|oauth*` OR keywords `auth, login, session, token, jwt, oauth, password, sso, sign-in`
+- `touches_secrets`: paths `.env|secrets|*.pem|credentials` OR keywords `secret, credential, api key, private key`
+- `touches_ci`: paths `.github/workflows|Dockerfile|.gitlab-ci|buildspec` OR keywords `workflow, pipeline, dockerfile, ci/cd`
+- `touches_prompts`: paths `agents/*.md|.claude/agents/|skills/*/SKILL.md|templates/*.md` OR keywords `prompt, agent, subagent, system prompt, worker`
+- `touches_public_api`: keywords `endpoint, route, public api, exported, breaking change, migration`
+
+Derive recommendations (see planner-policy §4a for the exact rule table).
+
+**If both recommendations are `off` → SKIP this step entirely.** Proceed
+to Step 7. The whole point of opt-in is that 80–90% of tickets see no
+extra question here.
+
+**If either recommendation is non-`off`**, use ONE `AskUserQuestion`:
+
+| header | question | options |
+|--------|----------|---------|
+| Review | ⚠️ <reason>. Suggested: review_mode=<X>, security_review=<Y>. | [a] approve recommendation (Recommended) / [m] max — strict + full / [n] keep both off (speed-only) / [e] customize each axis |
+
+Where `<reason>` is a short phrase like "touches auth surface" or
+"multi-worker change with public API".
+
+Branch handling:
+- `[a]` → write the recommended values into `plan.md` frontmatter (use `Edit`).
+- `[m]` → write `review_mode: strict`, `security_review: full` (most thorough; biggest LLM cost).
+- `[n]` → leave both at `off`.
+- `[e]` → ask two follow-up AskUserQuestion calls, one per axis:
+   1. `review_mode?` → [strict] / [lenient] / [off]
+   2. `security_review?` → [full] / [diff] / [off]
+   Then write the chosen values.
+
+After writing, proceed to Step 7. (Sha will be computed on `[a]` at the
+plan gate; the frontmatter values are part of the locked content.)
 
 ## Step 7 — plan gate
 

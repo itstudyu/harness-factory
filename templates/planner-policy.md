@@ -87,9 +87,118 @@ Refuse to approve a plan that has any of:
 - Verification items that say "manual review" or "looks good".
 - Empty `Out of scope:` (every plan has some).
 
+### No-placeholders deny-list (applies to every `plan.<worker>.md ## Tasks`)
+
+Refuse to approve a worker plan whose tasks contain any of the
+following — these are plan failures, not minor cleanups:
+
+- `TBD`, `TODO`, `FIXME` as a task line.
+- `implement later`, `come back to this`, `will add in a follow-up`.
+- `add appropriate error handling` without specifying which error path.
+- `similar to Task N` (every task must stand on its own).
+- `write tests for the above` without naming the cases.
+- A task that has no observable change in the diff (e.g. "think about X").
+- A task whose effort is unknown ("might be small, might be large").
+- A task that bundles >5 file edits with no sub-tasks (split it).
+
+Why: the spec-reviewer compares the diff against these tasks one by
+one. Placeholders create ambiguous PASS/FAIL — reviewer can't decide if
+the task was met. The fix is to either make the task concrete or to
+split it into smaller, concrete tasks.
+
 ---
 
-## 5. Memory update protocol
+## 4a. Review-mode and security-review proposal (Step 6.5 in /hfx:plan)
+
+After plan files are written but before the plan gate, scan the draft
+for risk signals and propose `review_mode` and `security_review` to
+the user **in a single AskUserQuestion call**. If no signals fire,
+keep both at `off` and skip the question — speed-first.
+
+### Risk signal detection
+
+Compute these booleans by inspecting the plan files. Scan BOTH:
+(a) paths in `## Files manifest` and `## Reference files`, and
+(b) the natural-language text of `## Goal` and `## Tasks` (since a new
+ticket may describe risky work before the planner knows the exact path).
+
+| Signal | Path match | Natural-language keyword match |
+|--------|-----------|--------------------------------|
+| `worker_count` ≥ 2 | (not applicable) | (not applicable) |
+| `touches_auth` | `auth*`, `login*`, `session*`, `token*`, `jwt*`, `oauth*`, `password*`, `permission*`, `role*` | `auth`, `login`, `session`, `token`, `jwt`, `oauth`, `password`, `permission`, `role`, `sign-in`, `sso` |
+| `touches_secrets` | `.env*`, `secrets*`, `*.pem`, `credentials*`, `config/auth*` | `secret`, `credential`, `api key`, `apikey`, `private key` |
+| `touches_ci` | `.github/workflows/*`, `.gitlab-ci*`, `Dockerfile*`, `buildspec*`, `Jenkinsfile` | `workflow`, `pipeline`, `dockerfile`, `ci/cd`, `github action` |
+| `touches_prompts` | `agents/**/*.md`, `.claude/agents/**`, `skills/**/SKILL.md`, `templates/*.md` | `prompt`, `agent`, `subagent`, `system prompt`, `worker` |
+| `touches_public_api` | (not applicable) | `endpoint`, `route`, `public api`, `exported`, `breaking change`, `migration` |
+
+A signal fires if EITHER the path-match OR the keyword-match hits.
+
+### Recommended values
+
+**review_mode:**
+- `strict` if: `worker_count >= 2` OR `touches_auth` OR `touches_public_api`
+- `lenient` if: single worker with 2–5 tasks (not covered above)
+- `off` if: single worker with 1 task AND only touches docs/comments/dep bumps
+
+**security_review:**
+- `full` if: brand-new auth/oauth system, external API integration with credentials, large dependency bump (≥5 new direct deps)
+- `diff` if: `touches_auth` OR `touches_secrets` OR `touches_ci` OR `touches_prompts`
+- `off` otherwise
+
+### Question shape
+
+If recommended values are both `off`, **skip the question** entirely.
+Otherwise, ask ONE consolidated question (see `/hfx:plan` Step 6.5
+for the AskUserQuestion options block):
+
+> ⚠️ This plan touches **<reason>**. Suggested:
+> - review_mode = `<X>`
+> - security_review = `<Y>`
+>
+> [a] approve recommendation
+> [s] strict + diff (both maxed)
+> [n] keep both off (speed-only)
+> [e] customize each axis
+
+Record the chosen values into `plan.md` frontmatter BEFORE Step 7's
+sha computation, so the gate locks them in.
+
+### Why an opt-in question
+
+hfx is speed-first (README §"Why this exists"). Reviewer dispatches
+cost extra LLM calls and minutes. Default-off means the 80–90% of
+tickets that touch no risky surface stay fast; only the tickets
+with actual risk signals trigger this question.
+
+---
+
+## 5. Memory protocol (read + write)
+
+### Read side — active memory retrieval at /hfx:plan Step 1
+
+`/hfx:plan` Step 1 reads `.harness/memory/INDEX.md`. After that, do not
+stop at the one-line hooks — **load the top 1–3 theme bodies** whose
+INDEX line shares ≥1 lowercase keyword with `$ARGUMENTS`. This is
+deterministic keyword match, not LLM judgment. Pseudocode:
+
+```
+keywords = lowercase($ARGUMENTS).split()
+matches  = []
+for line in INDEX.md:
+  hook = lowercase(line)
+  hits = count(k in hook for k in keywords)
+  if hits >= 1:
+    matches.append((hits, line.path))
+top_3 = matches.sort_by(hits desc).take(3)
+for path in top_3:
+  Read(`.harness/memory/<path>`)
+```
+
+If 0 matches → skip; memory adds no value here. The point is to surface
+prior learnings *during grilling*, so the planner doesn't ask the user
+to repeat decisions already recorded.
+
+### Write side — propose learnings after /hfx:run succeeds
 
 After `/hfx:run` completes successfully and user accepts results:
 
@@ -101,7 +210,12 @@ After `/hfx:run` completes successfully and user accepts results:
    - Proposed file (existing theme or new).
    - One-line summary that will appear in INDEX.md.
    - The full memory body (≤10 lines).
-4. Ask `[y]es / [n]o` per candidate. Only write what the user confirms.
+4. **Overlap check (deterministic):** grep each candidate's
+   title-keywords against existing `<theme>.md` files. If any file
+   matches, present the user with `[s]upersede / [a]ppend / [n]ew / [skip]`
+   instead of plain `[y]/[n]`. Never auto-pick `supersede`.
+5. Ask `[y]es / [n]o` (or the overlap variant) per candidate. Only
+   write what the user confirms.
 
 **Never** save:
 - Code patterns already visible in the repo.

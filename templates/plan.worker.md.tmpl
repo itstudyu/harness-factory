@@ -3,10 +3,31 @@ worker: __WORKER_NAME__
 parent: plan.md
 ---
 
+## Files manifest
+
+<Explicit Create / Modify / Test split. The spec-reviewer compares the
+worker's actual `Files changed` against this list; anything outside it
+is treated as scope creep.>
+
+- **Create:**
+  - `<path/to/new-file>` — <what it is>
+- **Modify:**
+  - `<path/to/existing-file>:<line-or-symbol>` — <what to change>
+- **Test:**
+  - `<path/to/test-file>` — <what it covers>
+
 ## Tasks
 
-- [ ] <Concrete task 1. Imperative form. References file:line if relevant.>
+- [ ] <Concrete task 1. Imperative form. References file:line if relevant. NO placeholders.>
 - [ ] <Concrete task 2.>
+
+<!--
+Hard rule (from planner-policy.md §4): tasks must NOT contain any of:
+  TBD, TODO, "implement later", "add appropriate error handling" without code,
+  "similar to Task N", "write tests for the above" without code, or steps
+  with no concrete change. Each task should be a 2-15 minute unit of work
+  whose completion is observable in the diff.
+-->
 
 ## Reference files
 

@@ -110,6 +110,23 @@ In one block of tool calls (parallel where independent):
    `${CLAUDE_PLUGIN_ROOT}/agents/helpers/code-analyst.md` to
    `${CLAUDE_PROJECT_DIR}/.claude/agents/code-analyst.md`.
 
+7. **Always copy the three reviewer workers** (no question asked):
+   ```
+   cp "${CLAUDE_PLUGIN_ROOT}/agents/workers/spec-reviewer.md"     "${CLAUDE_PROJECT_DIR}/.claude/agents/spec-reviewer.md"
+   cp "${CLAUDE_PLUGIN_ROOT}/agents/workers/quality-reviewer.md"  "${CLAUDE_PROJECT_DIR}/.claude/agents/quality-reviewer.md"
+   cp "${CLAUDE_PLUGIN_ROOT}/agents/workers/security-reviewer.md" "${CLAUDE_PROJECT_DIR}/.claude/agents/security-reviewer.md"
+   ```
+
+   **Why always:** these are not implementation workers — they are
+   review meta-workers used by the dispatcher when `plan.md` frontmatter
+   says `review_mode != off` or `security_review != off`. Both fields
+   default to `off`, so installing the files does NOT make every ticket
+   slower — they only fire on opt-in. Always installing means users
+   never hit "Agent type 'spec-reviewer' not found" when they later
+   enable review on a risky ticket. Per hfx's anti-self-evaluation
+   principle (planner-policy.md §6), these must be available so that
+   workers do not grade themselves.
+
 ## Step 4 — confirm + restart notice
 
 Print a tree of what was created (use `Bash` `find .harness .claude/agents -maxdepth 3`)
