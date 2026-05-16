@@ -31,9 +31,11 @@ The plugin ships templates and default agents at:
 - Templates:   `${CLAUDE_PLUGIN_ROOT}/templates/`
 - Workers:     `${CLAUDE_PLUGIN_ROOT}/agents/workers/`
 
-## Step 1 — single question, four parts (multiSelect where useful)
+## Step 1 — bundled setup questions
 
-Use **one** `AskUserQuestion` call with these four questions:
+`AskUserQuestion` has a hard 4-question cap, so use **two** calls:
+
+**Call 1** — the four bundled config questions:
 
 | header        | question                                                     | multiSelect | options |
 |---------------|--------------------------------------------------------------|-------------|---------|
@@ -41,7 +43,12 @@ Use **one** `AskUserQuestion` call with these four questions:
 | code-analyst  | Install the code-analyst helper (read-only code analysis)?   | false       | yes / no |
 | Policy seed   | How should planner-policy start?                             | false       | default template (Recommended) / blank skeleton |
 | Refs seed     | Include example conditional entries in refs.yaml?            | false       | yes — examples (Recommended) / no — empty conditional |
-| Language      | What language should plan files and worker reports be written in? | false       | English (Recommended) / 한국어 / 日本語 / Other |
+
+**Call 2** — language (separate because of the 4-cap):
+
+| header   | question                                                          | multiSelect | options |
+|----------|-------------------------------------------------------------------|-------------|---------|
+| Language | What language should plan files and worker reports be written in? | false       | English (Recommended) / 한국어 / 日本語 / Other |
 
 Recommended defaults (first option in each): backend+frontend+docupdater
 all selected; code-analyst yes; default policy; examples in refs;

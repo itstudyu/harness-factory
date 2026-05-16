@@ -3,6 +3,16 @@
 All notable changes to hfx are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/).
 
+## v0.0.5.11 — 2026-05-16
+
+### Fixed
+- `/hfx:init` Step 1 now uses **two** `AskUserQuestion` calls (4 + 1)
+  instead of one bundled call. v0.0.5.9's added Language question
+  pushed the total to 5, hitting `AskUserQuestion`'s hard 4-question
+  cap and causing every init's first call to fail with `Invalid tool
+  parameters` (the LLM recovered by self-splitting, but the SKILL was
+  documenting an impossible call). Split is now explicit.
+
 ## v0.0.5.10 — 2026-05-16
 
 ### Added
