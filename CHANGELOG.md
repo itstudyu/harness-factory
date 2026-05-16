@@ -3,6 +3,34 @@
 All notable changes to hfx are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/).
 
+## v0.0.5.12 — 2026-05-16
+
+### Fixed
+- `/hfx:run` Step 4.5 had three `` ```! `` preprocess fences with
+  runtime placeholders (`<worktree-dir>`, `<TMP_MANIFEST>`, sample
+  manifest paths). Claude Code's `` ```! `` syntax runs the fenced
+  command at preprocess time, BEFORE the model can substitute values
+  — same class of bug as commit `2e16611` fixed for `<ticket-id>` in
+  plan/run SKILLs. Symptom: `handoff-worktree.sh` was called with
+  literal `<worktree-dir>` as its first argument and exited with
+  `error: not a directory: <worktree-dir>`. Converted Steps 4.5.3,
+  4.5.4, and 4.5.6 to plain `` ```bash `` instructional fences with
+  explicit "use the Bash tool to substitute and run" wording.
+- Step 4.5.4 also gained a hard precondition: skip the handoff if
+  the worktree path is empty/missing, the manifest is empty, or the
+  worker reported BLOCKED / NEEDS_CONTEXT (zero-change runs leave no
+  worktree behind, because Claude Code auto-cleans them).
+- `handoff-worktree.sh` now detects placeholder text (`<...>`) or
+  empty args and exits 2 with a message pointing at the SKILL bug,
+  as a defense-in-depth backstop.
+
+### Why
+Observed in hfx-test ticket `2026-05-16-login-screen-with-mock-auth`.
+This is the second occurrence of the `` ```! ``-with-placeholders
+pattern (first was `<ticket-id>` in `2e16611`). The fence runs in
+preprocessing; the model never sees an opportunity to substitute.
+Any `!`-fence whose body contains `<...>` placeholders is a bug.
+
 ## v0.0.5.11 — 2026-05-16
 
 ### Fixed

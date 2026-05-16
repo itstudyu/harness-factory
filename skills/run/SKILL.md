@@ -210,24 +210,48 @@ this step degrades to a no-op that just reports `out_of_scope` for
 everything the worker actually touched — fail-fast surfaces the
 scope mismatch.)
 
-Write the paths, one per line, to a temp file. Use the `Bash` tool:
+Write the paths, one per line, to a temp file. Use the `Bash` tool
+(NOT a `!` preprocess fence — the paths come from runtime parsing of
+the worker plan, so substitution must happen at execution time):
 
-```!
+```bash
+# After substituting the actual parsed paths (one per Create/Modify
+# entry), run via the Bash tool. The example below uses placeholder
+# paths; replace them with the real paths from Step 4.5.3's parse.
 TMP_MANIFEST="$(mktemp)"
-# (planner: emit the actual paths from the parsed manifest, one per line)
 printf '%s\n' \
-  "index.html" \
-  "style.css" \
+  "<path-1-from-parsed-manifest>" \
+  "<path-2-from-parsed-manifest>" \
   > "$TMP_MANIFEST"
 echo "$TMP_MANIFEST"
 ```
 
+Capture the printed temp-file path as `TMP_MANIFEST` for 4.5.4 / 4.5.6.
+
 ### 4.5.4 — Run the hand-off script
 
-Use the `Bash` tool — substitute the actual worktree path, project
-root, and manifest temp file:
+**Hard precondition.** Before running anything, verify ALL THREE:
 
-```!
+1. The worktree path (from 4.5.2) is non-empty AND `test -d` passes
+   on it.
+2. The `TMP_MANIFEST` file (from 4.5.3) is non-empty AND contains
+   at least 1 non-blank, non-comment line.
+3. The Agent result from Step 4 reported `## Status: DONE` or
+   `## Status: DONE_WITH_CONCERNS`.
+
+If ANY check fails, do NOT call the script. Record
+`step.handoff = {"skipped": "<reason>"}` (e.g. `"no_worktree_detected"`,
+`"empty_manifest"`, `"worker_blocked"`) and jump directly to 4.5.6.
+
+Use the `Bash` tool (NOT a `!` preprocess fence — the worktree path
+and manifest file path come from runtime steps 4.5.2 / 4.5.3 and
+must be substituted at execution time):
+
+```bash
+# Substitute <worktree-dir> with the path from 4.5.2 and
+# <TMP_MANIFEST> with the temp file path from 4.5.3, then run via
+# the Bash tool. Do NOT put this in a !-fence — the values are
+# unknown until runtime.
 bash "${CLAUDE_PLUGIN_ROOT}/scripts/handoff-worktree.sh" \
      "<worktree-dir>" \
      "${CLAUDE_PROJECT_DIR}" \
@@ -269,7 +293,13 @@ are the paths reviewers and results.md will see.
 
 ### 4.5.6 — Clean up the temp manifest
 
-```!
+Use the `Bash` tool (NOT a `!` preprocess fence — `TMP_MANIFEST` is a
+runtime value). If 4.5.3 was skipped (precondition failed in 4.5.4),
+there is no temp file to remove; skip this step too:
+
+```bash
+# Substitute <TMP_MANIFEST> with the path from 4.5.3, then run via
+# the Bash tool. Safe to skip if TMP_MANIFEST was never created.
 rm -f "<TMP_MANIFEST>"
 ```
 

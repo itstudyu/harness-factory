@@ -76,6 +76,26 @@ worktree_dir="$1"
 project_root="$2"
 manifest_file="$3"
 
+# Placeholder / empty guard. The root cause this guards against is
+# /hfx:run Step 4.5.4 being placed in a Claude Code ```! preprocess
+# fence: the shell runs the literal command "<worktree-dir>" before
+# the model can substitute the runtime value. Step 4.5.4 has been
+# moved to a plain ```bash fence (substituted at execution time), but
+# we still trip the alarm here for defense in depth.
+case "$worktree_dir" in
+  ""|*"<"*">"*)
+    echo "error: handoff-worktree.sh received placeholder/empty worktree_dir ('$worktree_dir')." >&2
+    echo "       caller did not substitute the value before invocation." >&2
+    echo "       see skills/run/SKILL.md Step 4.5.4 — must use Bash tool, not a !-fence." >&2
+    exit 2 ;;
+esac
+case "$manifest_file" in
+  ""|*"<"*">"*)
+    echo "error: handoff-worktree.sh received placeholder/empty manifest_file ('$manifest_file')." >&2
+    echo "       caller did not substitute the value before invocation." >&2
+    exit 2 ;;
+esac
+
 for d in "$worktree_dir" "$project_root"; do
   if [ ! -d "$d" ]; then
     echo "error: not a directory: $d" >&2
