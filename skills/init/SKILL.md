@@ -61,6 +61,40 @@ call (sequentially — at most 3 calls total). Each call asks:
 
 Capture answers in a small in-memory map keyed by worker name.
 
+## Step 2.5 — custom workers (names not in templates/)
+
+Shipped template list: `backend`, `frontend`, `docupdater`.
+
+For each Step-1 Workers entry whose name is NOT in that list, treat
+it as a **custom worker**. For each such worker, make ONE
+`AskUserQuestion` call:
+
+| header  | question | options |
+|---------|----------|---------|
+| Source  | Where should this custom worker's rules come from? | [u] URL (I will WebFetch) / [f] file path in this repo / [d] short prose from you / [c] cancel — drop this worker |
+| Detail  | (Provide URL / path / prose; depends on Source) | <free-form via Other> |
+
+Then act on the chosen Source **before** Step 3 writes the worker file:
+
+- `[u] URL` — MUST `WebFetch` the URL. The worker body must quote at
+  least 3 concrete rules from the fetched content. If WebFetch fails
+  or returns no usable rules, STOP, report the failure, and ask the
+  user to choose a different Source. Do **not** fall back to
+  training-data recollection.
+- `[f] file` — MUST `Read` the file. Same ≥3-rule quoting requirement.
+- `[d] prose` — write only what the user provided in Detail. Do not
+  invent additional rules.
+- `[c] cancel` — drop this worker from the install list and continue.
+
+**Forbidden:** writing a custom worker from training-data recollection
+of a library/framework's rules. Even when you "know" Angular / React /
+Django conventions, the user named a specific source for a reason
+(version drift, internal style, etc.). Recollection-based custom
+workers are an init-time hallucination vector.
+
+Capture the fetched/read content (or prose) in a per-worker map keyed
+by worker name; Step 3 item 5 uses it.
+
 ## Step 3 — generate .harness/
 
 In one block of tool calls (parallel where independent):
@@ -103,12 +137,28 @@ In one block of tool calls (parallel where independent):
 4. Read `${CLAUDE_PLUGIN_ROOT}/templates/memory-INDEX.md` and `Write` to
    `${CLAUDE_PROJECT_DIR}/.harness/memory/INDEX.md`.
 
-5. For each selected worker, read
-   `${CLAUDE_PLUGIN_ROOT}/agents/workers/<worker>.md` and `Write` to
-   `${CLAUDE_PROJECT_DIR}/.claude/agents/<worker>.md`, overriding the
-   `model:` frontmatter field with the user's choice from Step 2. With
-   this project-local copy in place, `/hfx:run` will dispatch the worker
-   by bare name (`Agent(subagent_type="<worker>", ...)`) and
+5. For each selected worker:
+   - **Shipped worker** (`backend`, `frontend`, `docupdater`): read
+     `${CLAUDE_PLUGIN_ROOT}/agents/workers/<worker>.md` and `Write` to
+     `${CLAUDE_PROJECT_DIR}/.claude/agents/<worker>.md`, overriding the
+     `model:` frontmatter field with the user's choice from Step 2.
+   - **Custom worker** (from Step 2.5): `Write` a new file at
+     `${CLAUDE_PROJECT_DIR}/.claude/agents/<worker>.md` with frontmatter:
+     ```
+     ---
+     name: <worker-name>
+     description: <one line derived from the Source content>
+     model: <Step 2 choice>
+     tools: Read, Glob, Grep, Bash
+     maxTurns: 20
+     ---
+     ```
+     Body: a short intro paragraph naming the Source (URL / file path /
+     "user-provided prose"), followed by the ≥3 quoted rules verbatim
+     from Step 2.5. No invented rules.
+
+   With this project-local copy in place, `/hfx:run` dispatches the
+   worker by bare name (`Agent(subagent_type="<worker>", ...)`) and
    `/hfx:edit-worker` can modify it without touching the plugin seed.
 
 6. If code-analyst was selected, copy

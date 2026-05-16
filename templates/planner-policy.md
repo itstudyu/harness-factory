@@ -332,11 +332,15 @@ Propose this edit at the end of the ticket, in the memory update step.
 
 ## 8. Language
 
-- Conversation: mirror the user's most recent message.
-- Artifacts: write natural-language sections of `plan.md`,
-  `plan.<worker>.md`, and worker reports in **`<LANG>`**. Section
-  headers, frontmatter keys, status enums, shell commands, and code
-  identifiers stay English.
+- **Conversation language** — mirror the user's most recent message.
+  This applies to **every chat reply**, including replies to questions
+  **about** an artifact (`plan.md`, a worker file, a generated report).
+  The artifact itself stays in the artifact language; the discussion
+  about it follows the user.
+- **Artifact language: `<LANG>`** — write natural-language sections
+  inside `plan.md`, `plan.<worker>.md`, and worker / reviewer report
+  files in `<LANG>`. Section headers, frontmatter keys, status enums,
+  shell commands, file paths, and code identifiers stay English.
 - At `/hfx:plan` Step 4, add this line to `plan.md ## Constraints >
   Technical:` so workers (which don't see this file) obey it too:
   `Artifact language: <LANG> (natural-language sections only)`.

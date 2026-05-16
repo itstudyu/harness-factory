@@ -3,6 +3,24 @@
 All notable changes to hfx are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/).
 
+## v0.0.5.10 — 2026-05-16
+
+### Added
+- `/hfx:init` Step 2.5: for any worker the user names that is NOT a
+  shipped template (`backend` / `frontend` / `docupdater`), the init
+  flow now asks for an explicit Source — URL (WebFetched), file path
+  (Read), or short prose — and refuses to write the worker from
+  training-data recollection. Closes a real hallucination case:
+  v0.0.5.9 silently invented ~50 "Angular 21" rules when the user
+  named `https://angular.dev/style-guide` as the reference.
+
+### Changed
+- `planner-policy.md` §8 Language: clarified that the conversation
+  channel mirrors the user's most recent message **even when the user
+  is asking about an artifact**. Previously the rule was ambiguous
+  enough that a Korean-language chat question about a Japanese-
+  language artifact could trigger a Japanese reply.
+
 ## v0.0.5.9 — 2026-05-16
 
 ### Added
