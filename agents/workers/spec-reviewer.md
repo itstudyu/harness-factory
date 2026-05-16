@@ -63,7 +63,22 @@ authoritative.
    a whole still fails (e.g. all tasks done but the verification command
    in `plan.md` was not actually run).
 
-7. **Read-only.** You have `Read, Glob, Grep, Bash` — no `Edit, Write`.
+7. **Cross-worker contract enforcement.** If `plan.md` `## Constraints >
+   Technical:` declares a cross-worker contract (a line that pins a wire
+   shape — HTTP payload, queue message, file handoff, IPC, shared
+   in-process state — and both sides' obligation), you MUST verify the
+   diff implements **the side this worker owns**:
+   - **Producer side** (this worker sends): the diff actually constructs
+     the declared payload shape (matching keys, types, endpoint/route).
+   - **Consumer side** (this worker receives): the diff actually parses
+     and acts on the declared shape, including the declared
+     validation/error response.
+   A producer that sends a different key (`username` vs `email`) or a
+   consumer that skips the declared server-side re-validation is a
+   `SPEC_FAIL` finding, regardless of whether the worker's per-task list
+   is fully MET. The contract is binding on top of `## Tasks`.
+
+8. **Read-only.** You have `Read, Glob, Grep, Bash` — no `Edit, Write`.
    Never modify code. If you find a fix, describe it in the finding,
    do not apply it.
 

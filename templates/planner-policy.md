@@ -97,6 +97,18 @@ Every plan.md MUST have:
 - A `## Goal` section with **one verifiable** outcome.
 - A `## Verification` section with checkboxes that map 1-to-1 to the goal.
 - A `## Constraints` section with an explicit `Out of scope:` list.
+- **Cross-worker contract** — if `worker_count >= 2` AND the workers share
+  a runtime path (HTTP request, queue message, file handoff, IPC, shared
+  in-process state), `## Constraints > Technical:` MUST include a one-line
+  contract that pins the wire shape and both sides' obligation. Example:
+  `frontend POSTs {email: string, password: string} to /api/auth/login;
+  backend re-validates password.length === 10 server-side, returns 400
+  {error: "PASSWORD_LENGTH"} on mismatch`. Workers run in isolated
+  worktrees and cannot see each other's decisions — without this line,
+  each picks a payload shape independently and integration breaks. Omit
+  for single-worker tickets and for multi-worker tickets where workers
+  do not share a runtime path (e.g., backend + docupdater editing
+  unrelated files).
 
 Refuse to approve a plan that has any of:
 - Vague goals ("improve performance", "clean up").
