@@ -243,40 +243,29 @@ inspection.
 
 ---
 
-## Reviewer workers (v0.0.5)
+## Reviewer workers (v0.0.5+)
 
-Three fresh-context reviewer workers ship by default but stay idle on
-most tickets. They are installed unconditionally by `/hfx:init` but
-only dispatched when `plan.md` frontmatter sets them on:
+Three read-only reviewer workers (`spec-reviewer`, `quality-reviewer`,
+`security-reviewer`) ship by default. All default to **off** — normal
+tickets pay zero extra LLM cost.
 
-- `spec-reviewer` — adversarial spec compliance. Reads the per-worker
-  plan + actual diff; returns `SPEC_PASS` or `SPEC_FAIL` with itemized
-  gaps. Fires when `review_mode ∈ {lenient, strict}`.
-- `quality-reviewer` — code quality (Critical/Important/Minor with a
-  concrete "Important" bar). Fires when `review_mode == strict` AND
-  spec passed.
-- `security-reviewer` — CSO-style audit (8/10 confidence gate, exploit
-  scenario required, anti-prompt-injection, 22 hard-exclusions). Fires
-  when `security_review ∈ {diff, full}`.
+- `/hfx:plan` Step 6.5 scans the draft for risk signals (auth/secrets/CI/
+  prompt files, multi-worker tickets, public API). If anything fires, it
+  asks once whether to enable `review_mode` (spec / spec+quality) and/or
+  `security_review` (diff / full). Otherwise no question is asked.
+- `/hfx:run` reads the locked frontmatter and dispatches reviewers
+  automatically — no questions at run time.
+- If a reviewer FAILs, the step is marked failed and the ticket stays in
+  `active/`. v0.0.5 deliberately does NOT auto-retry — code never moves
+  without a human signature.
 
-All three are read-only (`Read, Glob, Grep, Bash`, no `Edit/Write`).
-
-`/hfx:plan` Step 6.5 proposes `review_mode` and `security_review` based
-on risk signals (auth/secrets/CI/prompt files, multi-worker tickets,
-public API changes). Both default to `off` so normal tickets pay zero
-extra LLM cost — only risky surfaces trigger an opt-in question at
-plan time. `/hfx:run` reads the locked frontmatter and dispatches
-reviewers automatically (no questions).
-
-If a reviewer returns FAIL, the step is marked failed; the ticket
-stays in `active/` for human inspection. v0.0.5 deliberately does NOT
-re-dispatch the implementer with reviewer findings — code never moves
-without a human signature (see `skills/run/SKILL.md` Step 4a.4 for the
-rationale).
-
-`/hfx:security` is the standalone audit command — user-invoked, runs
-the same `security-reviewer` over the whole repo (or `--diff`), writes
-a JSON report to `.harness/security-reports/`. Use periodically.
+`/hfx:security` is a standalone audit command for periodic use, modelled
+after gstack `/cso`. It applies the same zero-noise discipline (8/10
+confidence gate, concrete exploit scenario required, anti-manipulation,
+codified false-positive precedents). **Scope is intentionally narrower
+than gstack `/cso`**: hfx covers the web-app hot path (secrets, deps,
+CI, prompt/skill supply chain, auth, OWASP-lite). For deep infra / LLM
+/ STRIDE / data-classification audits, use gstack `/cso` directly.
 
 ## Helpers
 

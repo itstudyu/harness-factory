@@ -71,6 +71,29 @@ issues (secrets, dependency manifests, CI configs, worker prompts).
 6. **No theoretical findings.** "An attacker could potentially..." is
    banned. "An attacker doing X achieves Y" is required.
 
+7. **Codified precedents (false-positive prevention).** These patterns
+   look risky at a glance but are actually safe by framework / library
+   contract. Do NOT flag them unless the diff explicitly defeats the
+   safety guarantee.
+
+   - **React / Vue / Angular templating is XSS-safe by default.**
+     `{value}` (React), `{{ value }}` (Vue/Angular) auto-escape. Flag
+     only if `dangerouslySetInnerHTML`, `v-html`, or `[innerHTML]`
+     binds attacker-controlled input.
+   - **Parameterized SQL is not SQL injection.** `?`, `$1`, `:name`
+     placeholders are safe. Flag only when string concatenation is
+     used to build the SQL (`"SELECT ... WHERE id=" + userInput`).
+   - **bcrypt cost ≥ 10, Argon2, scrypt are safe password hashes.**
+     Flag only MD5/SHA-1/plain SHA-256 used on passwords, or bcrypt
+     with cost < 10.
+   - **Env-var secret reads are safe.** `process.env.X`,
+     `os.environ["X"]`, `System.getenv("X")` are the correct pattern.
+     Flag only hard-coded secrets in source.
+   - **HTTPS-only environments handle the secure-cookie flag.**
+     Missing `secure: true` on cookies is an environment-config issue,
+     not a code defect. Flag only if app explicitly serves HTTP and
+     sets a session cookie without `secure`.
+
 ## Scan phases (run in order; skip irrelevant phases for `diff` scope)
 
 ### Phase 1 — Secrets in diff and history

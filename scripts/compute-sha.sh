@@ -14,6 +14,17 @@
 # - created:    can get re-emitted with a new ISO timestamp if the
 #               planner regenerates frontmatter during an [e]dit cycle.
 #
+# What IS included (by design):
+# - review_mode    (off | lenient | strict)        ← v0.0.5
+# - security_review (off | diff | full)            ← v0.0.5
+# - dispatch_graph and all body sections
+#
+# Editing review_mode or security_review after [a]pproval invalidates
+# the gate and forces re-approval. This is intentional — those fields
+# decide whether reviewers fire during /hfx:run, so silently changing
+# them after approval would break the "what you approved is what runs"
+# guarantee.
+#
 # Usage: compute-sha.sh <ticket-dir>
 # Prints: 64-char hex digest on stdout. Exit 0 on success.
 
